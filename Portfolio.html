@@ -1,0 +1,1496 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Portfolio</title>
+    <!-- Proper font loading -->
+    <link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            overflow-x: hidden;
+            background-color: #000;
+            color: #fff;
+            /* Fix for scroll wheel glitching */
+            overflow-y: auto;
+            height: 100%;
+        }
+
+        /* Background video styles */
+        .bg-video-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            overflow: hidden;
+        }
+
+        .bg-video {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            min-width: 100%;
+            min-height: 100%;
+            width: auto;
+            height: auto;
+            transform: translateX(-50%) translateY(-50%);
+            object-fit: cover;
+            opacity: 0.4; /* Adjusted opacity to match black/white theme */
+        }
+
+        /* Video control button */
+        .video-control {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background-color: rgba(0, 0, 0, 0.7);
+            color: white;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            z-index: 1000;
+            transition: all 0.3s ease;
+            border: 1px solid white;
+        }
+
+        .video-control:hover {
+            transform: scale(1.1);
+            background-color: rgba(50, 50, 50, 0.7);
+        }
+
+        .video-control.playing .pause-icon {
+            display: block;
+        }
+
+        .video-control.playing .play-icon {
+            display: none;
+        }
+
+        .video-control:not(.playing) .pause-icon {
+            display: none;
+        }
+
+        .video-control:not(.playing) .play-icon {
+            display: block;
+        }
+
+        .landing-page {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: url('Cover.png') no-repeat center center;
+            background-size: cover;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+            cursor: pointer;
+            transition: opacity 0.5s ease-in-out; /* Faster fade out */
+        }
+
+        .landing-page.fade-out {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .click-text {
+            font-family: 'VT323', monospace;
+            font-size: 3rem;
+            color: white;
+            text-shadow: 2px 2px 0 #000;
+            letter-spacing: 2px;
+            animation: pulse 1.5s infinite alternate;
+        }
+
+        @keyframes pulse {
+            from {
+                transform: scale(1);
+                opacity: 1;
+            }
+            to {
+                transform: scale(1.05);
+                opacity: 0.8;
+            }
+        }
+
+        /* Enhanced Snowflake animation */
+        .snowflake {
+            position: absolute;
+            width: 8px;
+            height: 8px;
+            background: transparent;
+            border-radius: 50%;
+            pointer-events: none;
+            opacity: 0.8;
+            animation: fall linear;
+            z-index: 10;
+        }
+
+        .snowflake:before, .snowflake:after {
+            content: '';
+            position: absolute;
+            background: white;
+            width: 8px;
+            height: 2px;
+            top: 3px;
+            left: 0;
+        }
+
+        .snowflake:before {
+            transform: rotate(45deg);
+        }
+
+        .snowflake:after {
+            transform: rotate(-45deg);
+        }
+
+        @keyframes fall {
+            to {
+                transform: translateY(100vh) rotate(360deg);
+                opacity: 0;
+            }
+        }
+
+        /* Profile Page Styles */
+        .profile-page {
+            opacity: 0;
+            transition: opacity 0.5s ease-in-out; /* Faster fade transition */
+            min-height: 100vh;
+            background: url('/api/placeholder/1200/800') no-repeat center center fixed;
+            background-size: cover;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 2rem;
+            /* Fix for scroll wheel glitching - prevents unnecessary scrolling */
+            position: fixed;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+        }
+
+        .profile-page.visible {
+            opacity: 1;
+        }
+
+        .profile-container {
+border: 2px solid white;
+box-shadow: 0 0 10px rgba(255, 255, 255, 1), 0 0 20px rgba(255, 255, 255, 0.8), 0 0 30px rgba(255, 255, 255, 0.6);
+            background-color: rgba(0, 0, 0, 0.7);
+            border: 2px solid rgba(255, 255, 255, 1); /* Full white border */
+            border-radius: 20px;
+            width: 100%;
+            max-width: 550px;
+            overflow: hidden;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.5);
+            transform-style: preserve-3d;
+            transition: transform 0.6s ease;
+        }
+
+        .profile-container:hover {
+border: 2px solid white;
+box-shadow: 0 0 10px rgba(255, 255, 255, 1), 0 0 20px rgba(255, 255, 255, 0.8), 0 0 30px rgba(255, 255, 255, 0.6);
+
+            transform: perspective(1000px) rotateY(7deg) rotateX(3deg);
+        }
+
+        .view-counter {
+            font-family: 'VT323', monospace;
+            padding: 8px 15px;
+            font-size: 0.9rem;
+            text-align: left;
+            color: #fff;
+            border-bottom: 1px solid rgba(255, 255, 255, 1);
+        }
+
+        .profile-content {
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .profile-picture {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 3px solid rgba(255, 255, 255, 1);
+        }
+
+        .username {
+            font-family: 'VT323', monospace;
+            font-size: 2rem;
+            margin-top: 10px;
+            letter-spacing: 1px;
+        }
+
+       /* Find and replace these styles in your CSS */
+.bio-container {
+    height: 24px;
+    text-align: center;
+    margin-top: 5px;
+    position: relative;
+}
+
+.bio {
+    font-family: 'VT323', monospace;
+    font-size: 1.5rem;
+    color: #fff;
+    text-align: center;
+    display: inline-block;
+    white-space: nowrap;
+    overflow: hidden;
+    visibility: hidden;
+    opacity: 0;
+    transition: opacity 0.3s;
+}
+
+.bio.active {
+    visibility: visible;
+    opacity: 1;
+}
+
+/* Remove these CSS classes as we'll handle the animation in JavaScript */
+/* 
+.bio.typing {
+    animation: typing 3s steps(20, end) forwards,
+               blink-caret 0.75s step-end infinite;
+    border-right: 2px solid #fff;
+}
+
+.bio.deleting {
+    animation: deleting 2s steps(20, end) forwards,
+               blink-caret 0.75s step-end infinite;
+    border-right: 2px solid #fff;
+}
+
+@keyframes typing {
+    from { width: 0 }
+    to { width: 100% }
+}
+
+@keyframes deleting {
+    from { width: 100% }
+    to { width: 0 }
+}
+
+@keyframes blink-caret {
+    from, to { border-color: transparent }
+    50% { border-color: white }
+}
+*/
+
+        .social-links {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .social-icon {
+            width: 40px;
+            height: 40px;
+            background-color: #000;
+            border: 1px solid white;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transition: transform 0.3s ease;
+        }
+
+        .social-icon:hover {
+            transform: scale(1.1);
+            background-color: #333;
+        }
+
+        .divider {
+            width: 100%;
+            height: 1px;
+            border: 2px solid white;
+box-shadow: 0 0 10px rgba(255, 255, 255, 0.8), 0 0 20px rgba(255, 255, 255, 0.6);
+text-shadow: 0 0 10px rgba(255, 255, 255, 0.8), 0 0 20px rgba(255, 255, 255, 0.6);
+
+            margin: 20px 0;
+        }
+
+        .contact-section {
+
+            display: flex;
+            align-items: center;
+            padding: 15px 20px;
+            background-color: rgba(0, 0, 0, 0.8);
+            border-top: 1px solid rgba(255, 255, 255, 1);
+            border-bottom-left-radius: 18px;
+            border-bottom-right-radius: 18px;
+        }
+
+        .contact-img {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            margin-right: 15px;
+        }
+
+        .contact-name {
+            font-family: 'VT323', monospace;
+            flex-grow: 1;
+        }
+
+        .contact-button {
+            background-color: #000;
+            color: white;
+            border: 1px solid white;
+            padding: 8px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-family: 'VT323', monospace;
+            display: flex;
+            align-items: center;
+            transition: background-color 0.3s ease;
+            margin-right: 10px; /* Add spacing between buttons */
+        }
+
+        .project-button {
+            background-color: #000;
+            color: white;
+            border: 1px solid white;
+            padding: 8px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-family: 'VT323', monospace;
+            display: flex;
+            align-items: center;
+            transition: all 0.3s ease;
+        }
+
+        .contact-button:hover {
+            background-color: #333;
+        }
+
+        .project-button:hover {
+            background-color: #333;
+            transform: translateY(-2px);
+        }
+
+        .arrow-icon {
+            margin-left: 5px;
+        }
+
+        /* Buttons container */
+        .buttons-container {
+            display: flex;
+            gap: 10px;
+        }
+
+        /* Improved Projects Section */
+        .projects-section {
+            display: none;
+            padding: 3rem;
+            width: 100%;
+            min-height: 100vh;
+            position: fixed;
+            top: 0;
+            left: 0;
+            overflow-y: auto;
+            background-color: rgba(0, 0, 0, 0.8);
+            z-index: 95;
+            transition: opacity 0.3s ease;
+        }
+
+        .projects-container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .section-title {
+            font-family: 'VT323', monospace;
+            font-size: 2.5rem;
+            margin: 2rem 0 1rem;
+            border-bottom: 2px solid #fff;
+            padding-bottom: 0.5rem;
+        }
+
+        .projects-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+            margin-bottom: 2rem;
+        }
+
+        .project-card {
+            background: rgba(0, 0, 0, 0.8);
+            border: 2px solid #fff;
+            padding: 1.5rem;
+            border-radius: 10px;
+            transition: all 0.4s ease;
+            transform-style: preserve-3d;
+            position: relative;
+            cursor: pointer;
+        }
+
+        .project-card:hover {
+            transform: translateY(-5px) perspective(500px) rotateX(2deg);
+            box-shadow: 0 15px 30px rgba(0, 0, 0, 0.6);
+        }
+
+        .project-card h3 {
+            font-family: 'VT323', monospace;
+            margin-bottom: 1rem;
+            font-size: 1.5rem;
+        }
+
+        .project-card p {
+            line-height: 1.6;
+        }
+
+        .project-details {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.9);
+            border: 2px solid #fff;
+            border-radius: 10px;
+            width: 90%;
+            max-width: 800px;
+            max-height: 80vh;
+            overflow-y: auto;
+            padding: 2rem;
+            z-index: 1000;
+        }
+
+        .project-details-close {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            background: transparent;
+            border: none;
+            color: white;
+            font-size: 1.5rem;
+            cursor: pointer;
+        }
+
+        .project-gallery {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.project-gallery-item {
+  flex: 1;
+  min-width: 200px;
+  max-width: 300px;
+}
+
+.project-gallery-item img {
+  width: 100%;
+  height: auto;
+  object-fit: cover;
+  border-radius: 4px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+        /* Back button for projects view */
+        .back-button {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            background-color: rgba(0,0,0,0.7);
+            color: white;
+            border: 1px solid white;
+            padding: 10px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-family: 'VT323', monospace;
+            z-index: 1000;
+            display: none;
+            transition: all 0.3s ease;
+        }
+
+        .back-button:hover {
+            background-color: rgba(50,50,50,0.7);
+            transform: translateX(-3px);
+        }
+
+        .skills-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .skill-tag {
+            background: rgba(0, 0, 0, 0.8);
+            border: 1px solid white;
+            padding: 0.5rem 1rem;
+            border-radius: 5px;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            font-family: 'VT323', monospace;
+        }
+
+        .skill-tag:hover {
+            background: rgba(50, 50, 50, 0.8);
+            transform: translateY(-3px);
+            box-shadow: 0 5px 10px rgba(0, 0, 0, 0.3);
+        }
+
+        .skill-details {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.9);
+            border: 2px solid #fff;
+            border-radius: 10px;
+            width: 90%;
+            max-width: 600px;
+            max-height: 80vh;
+            overflow-y: auto;
+            padding: 2rem;
+            z-index: 1000;
+        }
+
+        .skill-details-close {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            background: transparent;
+            border: none;
+            color: white;
+            font-size: 1.5rem;
+            cursor: pointer;
+        }
+
+        .overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7);
+            z-index: 999;
+        }
+
+        /* Media queries for responsiveness */
+        @media (max-width: 768px) {
+            .click-text {
+                font-size: 2rem;
+            }
+            
+            .projects-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .profile-container {
+                max-width: 100%;
+            }
+            
+            .buttons-container {
+                flex-direction: column;
+                gap: 10px;
+            }
+            
+            .contact-button, .project-button {
+                margin-right: 0;
+                justify-content: center;
+            }
+
+            .projects-section {
+                padding: 1rem;
+            }
+
+            .project-details {
+                width: 95%;
+                padding: 1.5rem;
+            }
+
+            .skill-details {
+                width: 95%;
+                padding: 1.5rem;
+            }
+        }
+
+        /* Loading animation */
+        .loading {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 40px;
+            height: 40px;
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top: 4px solid white;
+            animation: spin 1s linear infinite;
+            z-index: 1001;
+            display: none;
+        }
+
+        @keyframes spin {
+            0% { transform: translate(-50%, -50%) rotate(0deg); }
+            100% { transform: translate(-50%, -50%) rotate(360deg); }
+        }
+
+        /* Progress bar for skills - improved version (CSS only) */
+.skill-progress {
+    width: 100%;
+    height: 6px; /* Slightly thinner for more elegance */
+    background-color: rgba(0, 0, 0, 0.5); /* Darker background */
+    border-radius: 10px; /* More rounded corners */
+    margin: 10px 0 20px;
+    overflow: hidden;
+    position: relative; /* For positioning the glow effect */
+    border: 1px solid rgba(255, 255, 255, 0.2); /* Subtle border */
+}
+
+.skill-progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg, #ffffff, #a3a3ff); /* Gradient from white to light blue */
+    border-radius: 10px;
+    position: relative;
+    transition: width 1.5s cubic-bezier(0.22, 1, 0.36, 1); /* Smoother easing animation */
+    box-shadow: 0 0 10px rgba(255, 255, 255, 0.8), 0 0 20px rgba(255, 255, 255, 0.3); /* Stronger glow effect */
+}
+
+/* Add a glowing reflection effect */
+.skill-progress-bar::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 50%;
+    background: linear-gradient(to bottom, rgba(255, 255, 255, 0.3), transparent);
+    border-radius: 10px 10px 0 0;
+}
+
+/* Add the moving glow animation */
+.skill-progress-bar::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+    animation: glow-slide 3s ease-in-out infinite;
+}
+
+@keyframes glow-slide {
+    0% { left: -100%; }
+    100% { left: 100%; }
+}
+
+/* Improve existing skill-level-label if present */
+.skill-level-label {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.8rem;
+    margin-bottom: 5px;
+    font-family: 'VT323', monospace;
+    opacity: 0.8;
+}
+
+.skill-level-label .beginner,
+.skill-level-label .expert {
+    text-shadow: 0 0 3px rgba(255, 255, 255, 0.5);
+}
+
+/* Add a subtle pulsing effect to the entire progress bar */
+@keyframes pulse-subtle {
+    0% { box-shadow: 0 0 10px rgba(255, 255, 255, 0.6); }
+    50% { box-shadow: 0 0 15px rgba(255, 255, 255, 0.8); }
+    100% { box-shadow: 0 0 10px rgba(255, 255, 255, 0.6); }
+}
+
+.skill-progress {
+    animation: pulse-subtle 4s infinite;
+}
+    </style>
+</head>
+<body>
+    <!-- Background Video -->
+    <div class="bg-video-container">
+        <video class="bg-video" id="background-video" loop muted>
+            <!-- Replace with your video file URL when you have it -->
+            <source src="Video.mp4" type="video/mp4">
+            <!-- Add fallback formats if needed -->
+            <source src="your-video-file.webm" type="video/webm">
+        </video>
+    </div>
+    
+    <!-- Video Control Button -->
+    <div class="video-control" id="video-control">
+        <svg class="play-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polygon points="5 3 19 12 5 21 5 3"></polygon>
+        </svg>
+        <svg class="pause-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="6" y="4" width="4" height="16"></rect>
+            <rect x="14" y="4" width="4" height="16"></rect>
+        </svg>
+    </div>
+
+    <!-- Loading Animation -->
+    <div class="loading" id="loading"></div>
+
+    <!-- Overlay for modal windows -->
+    <div class="overlay" id="overlay"></div>
+
+    <!-- Landing Page -->
+    <div class="landing-page" id="landing">
+        <div class="click-text">click anywhere</div>
+    </div>
+
+    <!-- Profile Page -->
+    <div class="profile-page" id="profile">
+        <div class="profile-container">
+            <div class="profile-content">
+                <img src="Profile.png" alt="Lebron Pereira" class="profile-picture">
+                <h1 class="username">Lebron Pereira</h1>
+                <div class="bio-container">
+                    <span class="bio" id="bio">Can't Rush Greatness</span>
+                </div>
+                <div class="social-links">
+                    <a href="https://www.instagram.com/lebron_eh" target="_blank" class="social-icon" aria-label="Instagram">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect>
+                            <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path>
+                            <line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line>
+                        </svg>
+                    </a>
+                    <a href="https://www.linkedin.com/in/lebron-pereira" target="_blank" class="social-icon" aria-label="LinkedIn">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"></path>
+                            <rect x="2" y="9" width="4" height="12"></rect>
+                            <circle cx="4" cy="4" r="2"></circle>
+                        </svg>
+                    </a>
+                    <a href="tel:+91 9923584490" class="social-icon" aria-label="Phone">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
+                        </svg>
+                    </a>
+                    <a href="mailto:lebronpereira7@gmail.com" class="social-icon" aria-label="Mail">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+                            <polyline points="22,6 12,13 2,6"></polyline>
+                        </svg>
+                    </a>
+                </div>
+            </div>
+            <div class="contact-section">
+                <img src="Profile.png" alt="User" class="contact-img">
+                <div class="contact-name">@lebronpereira</div>
+                <div class="buttons-container">
+                    <button class="project-button" id="projects-button">
+                        View Projects
+                        <span class="arrow-icon">→</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Projects Section -->
+    <div class="projects-section" id="projects">
+        <div class="projects-container">
+            <button class="back-button" id="back-button">← Back</button>
+            
+            <h2 class="section-title">My Projects</h2>
+            <div class="projects-grid">
+                <div class="project-card" data-project="cosmic">
+                    <h3>Cosmic Navigation</h3>
+                    <p>A space-themed interactive navigation system built with Three.js and WebGL. This project features 3D star mapping and smooth parallax effects.</p>
+                </div>
+                <div class="project-card" data-project="pixel">
+                    <h3>Pixel Weather</h3>
+                    <p>A retro-styled weather application that displays forecasts with pixel art animations. Built with React and the OpenWeather API.</p>
+                </div>
+                <div class="project-card" data-project="dream">
+                    <h3>Digital Dreamscape</h3>
+                    <p>An experimental audio-visual web experience that generates unique artwork based on user input. Created using the Web Audio API and Canvas.</p>
+                </div>
+            </div>
+            
+            <h2 class="section-title">Skills</h2>
+            <div class="skills-list">
+                <div class="skill-tag" data-skill="html">HTML5</div>
+                <div class="skill-tag" data-skill="css">CSS3</div>
+                <div class="skill-tag" data-skill="js">JavaScript</div>
+                <div class="skill-tag" data-skill="react">React</div>
+                <div class="skill-tag" data-skill="threejs">Three.js</div>
+                <div class="skill-tag" data-skill="webdesign">Web Design</div>
+                <div class="skill-tag" data-skill="ui">UI/UX</div>
+                <div class="skill-tag" data-skill="canvas">Canvas</div>
+                <div class="skill-tag" data-skill="webgl">WebGL</div>
+                <div class="skill-tag" data-skill="responsive">Responsive Design</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Project Details Modals -->
+    <div class="project-details" id="project-cosmic">
+        <button class="project-details-close" data-close="project-cosmic">×</button>
+        <h2>Cosmic Navigation</h2>
+        <p>A space-themed interactive navigation system that takes users on a journey through a virtual galaxy. The application allows users to explore various celestial bodies and learn about astronomical concepts.</p>
+        <h3>Technologies Used:</h3>
+        <ul>
+            <li>Three.js for 3D rendering and WebGL integration</li>
+            <li>Custom shaders for realistic space effects</li>
+            <li>React for component-based architecture</li>
+            <li>Animated transitions with GSAP</li>
+        </ul>
+        <h3>Key Features:</h3>
+        <ul>
+            <li>Interactive 3D star mapping</li>
+            <li>Dynamic camera movements and parallax effects</li>
+            <li>Realistic planet rendering with custom textures</li>
+            <li>Educational content about astronomical objects</li>
+        </ul>
+        <div class="project-gallery">
+            <div class="project-gallery-item">
+    <img src="cosmicnav1.jpg" alt="Satellite">
+</div>
+           <div class="project-gallery-item">
+    <img src="cosmicnav2.jpg" alt="Saturn Inforamtion">
+</div><div class="project-gallery-item">
+    <img src="cosmicnav3.jpg" alt="Planets">
+</div>
+        </div>
+    </div>
+
+    <div class="project-details" id="project-pixel">
+        <button class="project-details-close" data-close="project-pixel">×</button>
+        <h2>Pixel Weather</h2>
+        <p>A nostalgic weather application that combines modern data with retro-styled pixel art animations. The app provides accurate weather forecasts while delighting users with charming visual effects.</p>
+        <h3>Technologies Used:</h3>
+        <ul>
+            <li>React for frontend development</li>
+            <li>OpenWeather API for real-time weather data</li>
+            <li>Sprite animations with CSS</li>
+            <li>Responsive design for all devices</li>
+        </ul>
+        <h3>Key Features:</h3>
+        <ul>
+            <li>Pixel art animations for different weather conditions</li>
+            <li>Location-based weather forecasts</li>
+            <li>5-day prediction with hourly breakdowns</li>
+            <li>Dynamic day/night cycle based on location</li>
+        </ul>
+        <div class="project-gallery">
+            <div class="project-gallery-item">
+    <img src="pixel1.jpg" alt="Weather(Phones)">
+</div>
+            <div class="project-gallery-item">
+    <img src="pixel2.jpg" alt="Weather(All)">
+</div>
+            <div class="project-gallery-item">
+    <img src="pixel3.jpg" alt="Map">
+</div>
+        </div>
+    </div>
+
+    <div class="project-details" id="project-dream">
+        <button class="project-details-close" data-close="project-dream">×</button>
+        <h2>Digital Dreamscape</h2>
+        <p>An experimental audio-visual web experience that transforms user input into unique digital artwork. The project explores the intersection of sound, color, and generative art.</p>
+        <h3>Technologies Used:</h3>
+        <ul>
+            <li>Web Audio API for sound processing</li>
+            <li>Canvas API for visual rendering</li>
+            <li>JavaScript for real-time audio analysis</li>
+            <li>Custom algorithms for generating visual patterns</li>
+        </ul>
+        <h3>Key Features:</h3>
+        <ul>
+            <li>Real-time audio visualization</li>
+            <li>User-generated artwork based on sound input</li>
+            <li>Customizable color palettes and visual effects</li>
+            <li>Option to save and share generated art</li>
+        </ul>
+        <div class="project-gallery">
+
+            <div class="project-gallery-item">
+
+    <img src="dream1.jpg" alt="Floating">
+
+</div>
+
+            <div class="project-gallery-item">
+
+    <img src="dream2.jpg" alt="Astral Plane">
+
+</div>
+
+            <div class="project-gallery-item">
+
+    <img src="dream3.jpg" alt="Falling">
+
+</div>
+
+        </div>
+
+    </div>
+
+    <!-- Skill Details Modals -->
+    <div class="skill-details" id="skill-html">
+        
+        <h2>HTML5</h2>
+        <p>I have extensive experience with HTML5, the latest version of the Hypertext Markup Language that's fundamental to web development.</p>
+        <div class="skill-progress">
+            <div class="skill-progress-bar" style="width: 95%;"></div>
+        </div>
+        <h3>Related Skills:</h3>
+        <ul>
+            <li>Semantic HTML</li>
+            <li>Accessibility standards (WCAG)</li>
+            <li>SVG integration</li>
+            <li>Canvas element</li>
+            <li>Web Components</li>
+        </ul>
+        <h3>Projects Using HTML5:</h3>
+        <ul>
+            <li>Cosmic Navigation</li>
+            <li>Pixel Weather</li>
+            <li>Digital Dreamscape</li>
+        </ul>
+    </div>
+
+    <div class="skill-details" id="skill-css">
+        
+        <h2>CSS3</h2>
+        <p>I'm proficient in CSS3, creating responsive layouts and engaging animations for modern web applications.</p>
+        <div class="skill-progress">
+            <div class="skill-progress-bar" style="width: 90%;"></div>
+        </div>
+        <h3>Related Skills:</h3>
+        <ul>
+            <li>Flexbox and Grid layouts</li>
+            <li>CSS Animations and Transitions</li>
+            <li>CSS Variables</li>
+            <li>Media Queries</li>
+            <li>CSS Preprocessors (SASS/SCSS)</li>
+        </ul>
+        <h3>Projects Using CSS3:</h3>
+        <ul>
+            <li>Pixel Weather</li>
+            <li>Portfolio Website</li>
+        </ul>
+    </div>
+
+    <div class="skill-details" id="skill-js">
+        
+        <h2>JavaScript</h2>
+        <p>JavaScript is my primary programming language, enabling me to create interactive and dynamic web experiences.</p>
+        <div class="skill-progress">
+            <div class="skill-progress-bar" style="width: 85%;"></div>
+        </div>
+        <h3>Related Skills:</h3>
+        <ul>
+            <li>ES6+ features</li>
+            <li>Asynchronous programming</li>
+            <li>DOM manipulation</li>
+            <li>Web APIs</li>
+            <li>JSON and AJAX</li>
+        </ul>
+        <h3>Projects Using JavaScript:</h3>
+        <ul>
+            <li>Cosmic Navigation</li>
+            <li>Digital Dreamscape</li>
+            <li>Portfolio Website</li>
+        </ul>
+    </div>
+
+    <div class="skill-details" id="skill-react">
+        
+        <h2>React</h2>
+        <p>I build modern web applications using React, focusing on component-based architecture and efficient state management.</p>
+        <div class="skill-progress">
+            <div class="skill-progress-bar" style="width: 80%;"></div>
+        </div>
+        <h3>Related Skills:</h3>
+        <ul>
+            <li>React Hooks</li>
+            <li>Context API</li>
+            <li>Redux</li>
+            <li>React Router</li>
+            <li>Next.js</li>
+        </ul>
+        <h3>Projects Using React:</h3>
+        <ul>
+            <li>Pixel Weather</li>
+            <li>Cosmic Navigation</li>
+        </ul>
+    </div>
+
+    <div class="skill-details" id="skill-threejs">
+       
+        <h2>Three.js</h2>
+        <p>I create immersive 3D web experiences using Three.js, a powerful JavaScript library for WebGL.</p>
+        <div class="skill-progress">
+            <div class="skill-progress-bar" style="width: 75%;"></div>
+        </div>
+        <h3>Related Skills:</h3>
+        <ul>
+            <li>WebGL fundamentals</li>
+            <li>3D modeling integration</li>
+            <li>Custom shaders</li>
+            <li>Animation techniques</li>
+            <li>Performance optimization</li>
+        </ul>
+        <h3>Projects Using Three.js:</h3>
+        <ul>
+            <li>Cosmic Navigation</li>
+        </ul>
+    </div>
+
+    <div class="skill-details" id="skill-webdesign">
+       
+        <h2>Web Design</h2>
+        <p>I blend creativity with technical skills to design visually appealing and user-friendly websites.</p>
+        <div class="skill-progress">
+            <div class="skill-progress-bar" style="width: 85%;"></div>
+        </div>
+        <h3>Related Skills:</h3>
+        <ul>
+            <li>Visual hierarchy</li>
+            <li>Color theory</li>
+            <li>Typography</li>
+            <li>Layout design</li>
+            <li>Responsive design principles</li>
+        </ul>
+        <h3>Projects Using Web Design:</h3>
+        <ul>
+            <li>Portfolio Website</li>
+            <li>Pixel Weather</li>
+            <li>Digital Dreamscape</li>
+        </ul>
+    </div>
+
+    <div class="skill-details" id="skill-ui">
+        
+        <h2>UI/UX</h2>
+        <p>I create intuitive user interfaces with a focus on enhancing user experience across all devices.</p>
+        <div class="skill-progress">
+            <div class="skill-progress-bar" style="width: 80%;"></div>
+        </div>
+        <h3>Related Skills:</h3>
+        <ul>
+            <li>User research</li>
+            <li>Wireframing</li>
+            <li>Prototyping</li>
+            <li>Usability testing</li>
+            <li>Interaction design</li>
+        </ul>
+        <h3>Projects Using UI/UX:</h3>
+        <ul>
+            <li>Cosmic Navigation</li>
+            <li>Pixel Weather</li>
+        </ul>
+    </div>
+
+    <div class="skill-details" id="skill-canvas">
+       
+        <h2>Canvas</h2>
+        <p>I utilize the HTML5 Canvas API to create dynamic graphics and animations for interactive web experiences.</p>
+        <div class="skill-progress">
+            <div class="skill-progress-bar" style="width: 75%;"></div>
+        </div>
+        <h3>Related Skills:</h3>
+        <ul>
+            <li>2D rendering</li>
+            <li>Particle systems</li>
+            <li>Animation techniques</li>
+            <li>Generative art</li>
+            <li>Image manipulation</li>
+        </ul>
+        <h3>Projects Using Canvas:</h3>
+        <ul>
+            <li>Digital Dreamscape</li>
+            <li>Portfolio Website</li>
+        </ul>
+    </div>
+
+    <div class="skill-details" id="skill-webgl">
+       
+        <h2>WebGL</h2>
+        <p>I leverage WebGL to create hardware-accelerated 3D graphics directly in the browser without plugins.</p>
+        <div class="skill-progress">
+            <div class="skill-progress-bar" style="width: 70%;"></div>
+        </div>
+        <h3>Related Skills:</h3>
+        <ul>
+            <li>Shader programming</li>
+            <li>GLSL</li>
+            <li>3D mathematics</li>
+            <li>Performance optimization</li>
+            <li>Post-processing effects</li>
+        </ul>
+        <h3>Projects Using WebGL:</h3>
+        <ul>
+            <li>Cosmic Navigation</li>
+        </ul>
+    </div>
+
+    <div class="skill-details" id="skill-responsive">
+        
+        <h2>Responsive Design</h2>
+        <p>I create websites that provide optimal viewing experiences across a wide range of devices, from desktop to mobile.</p>
+        <div class="skill-progress">
+            <div class="skill-progress-bar" style="width: 90%;"></div>
+        </div>
+        <h3>Related Skills:</h3>
+        <ul>
+            <li>Mobile-first approach</li>
+            <li>Flexible layouts</li>
+            <li>Media queries</li>
+            <li>Fluid typography</li>
+            <li>Viewport considerations</li>
+        </ul>
+        <h3>Projects Using Responsive Design:</h3>
+        <ul>
+            <li>Portfolio Website</li>
+            <li>Pixel Weather</li>
+            <li>Digital Dreamscape</li>
+        </ul>
+    </div>
+
+    <script>
+        // Video element and control
+        const backgroundVideo = document.getElementById('background-video');
+        const videoControl = document.getElementById('video-control');
+        const overlay = document.getElementById('overlay');
+        const loading = document.getElementById('loading');
+        
+        // Initialize video as paused
+        backgroundVideo.pause();
+        
+        // Toggle video playback
+        videoControl.addEventListener('click', function() {
+            if (backgroundVideo.paused) {
+                backgroundVideo.play();
+                videoControl.classList.add('playing');
+                // Unmute when playing
+                backgroundVideo.muted = false;
+            } else {
+                backgroundVideo.pause();
+                videoControl.classList.remove('playing');
+                // Mute when paused
+                backgroundVideo.muted = true;
+            }
+        });
+
+        // Landing page click event
+        document.getElementById('landing').addEventListener('click', function() {
+            this.classList.add('fade-out');
+            setTimeout(() => {
+                document.getElementById('profile').classList.add('visible');
+                // Start playing video when entering the site
+                backgroundVideo.play();
+                videoControl.classList.add('playing');
+                backgroundVideo.muted = false;
+                
+                // Start the typing animation for bio
+                startTypingAnimation();
+                
+                // Start automatic snowflake generation
+                startSnowfall();
+            }, 300); // Faster transition
+        });
+
+        // Enhanced Bio typing animation
+        const bioText = document.getElementById('bio');
+        const bioContent = "Can't Rush Greatness";
+        
+        // Replace the existing startTypingAnimation function with this one
+function startTypingAnimation() {
+    const words = ["Can't Rush Greatness."];
+    let currentWordIndex = 0;
+    let currentLetterIndex = 0;
+    let isDeleting = false;
+    bioText.textContent = '';
+    bioText.classList.add('active');
+    
+    function typeText() {
+        const currentWord = words[currentWordIndex];
+        
+        if (!isDeleting) {
+            // Typing forward
+            bioText.textContent = currentWord.substring(0, currentLetterIndex + 1) + 
+                (currentLetterIndex < currentWord.length - 1 ? '|' : '');
+            currentLetterIndex++;
+            
+            if (currentLetterIndex === currentWord.length) {
+                // Finished typing current word
+                if (currentWordIndex === words.length - 1) {
+                    // If it's the last word, pause before deleting the entire phrase
+                    setTimeout(() => {
+                        isDeleting = true;
+                        typeText();
+                    }, 1500);
+                } else {
+                    // If not the last word, add a space and continue to next word
+                    bioText.textContent += ' ';
+                    currentWordIndex++;
+                    currentLetterIndex = 0;
+                    setTimeout(typeText, 200);
+                }
+            } else {
+                // Continue typing current word
+                setTimeout(typeText, 100 + Math.random() * 100);
+            }
+        } else {
+            // Deleting backwards
+            const fullText = words.slice(0, currentWordIndex + 1).join(' ');
+            const currentPos = fullText.length - (fullText.length - currentLetterIndex);
+            
+            bioText.textContent = fullText.substring(0, currentPos) + 
+                (currentPos > 0 ? '|' : '');
+            
+            currentLetterIndex--;
+            
+            if (currentLetterIndex < 0) {
+                // Move to previous word or reset if at first word
+                if (currentWordIndex > 0) {
+                    currentWordIndex--;
+                    currentLetterIndex = words[currentWordIndex].length;
+                } else {
+                    // We've deleted everything, start over
+                    isDeleting = false;
+                    currentWordIndex = 0;
+                    currentLetterIndex = 0;
+                    bioText.textContent = '';
+                    setTimeout(typeText, 800); // Pause before starting again
+                    return;
+                }
+            }
+            
+            setTimeout(typeText, 50 + Math.random() * 50); // Delete faster than typing
+        }
+    }
+    
+    typeText();
+}
+
+        // Enhanced Snowflake effect
+        function startSnowfall() {
+    // Only create snowflakes on mouse move - no automatic generation
+    document.addEventListener('mousemove', function(e) {
+        // Create 1-3 snowflakes at mouse position
+        const count = Math.floor(Math.random() * 3) + 1;
+        for (let i = 0; i < count; i++) {
+            createSnowflake(e.clientX, e.clientY);
+        }
+    });
+}
+        // Create a snowflake at the given position
+        function createSnowflake(x, y) {
+            const snowflake = document.createElement('div');
+            snowflake.className = 'snowflake';
+            
+            // Randomize snowflake properties
+            const size = Math.random() * 5 + 3; // Size between 3-8px
+            const duration = Math.random() * 5 + 5; // Duration between 5-10s
+            const opacity = Math.random() * 0.7 + 0.3;
+            const horizontalMovement = Math.random() * 100 - 50; // -50 to 50px
+            
+            snowflake.style.width = `${size}px`;
+            snowflake.style.height = `${size}px`;
+            snowflake.style.left = `${x}px`;
+            snowflake.style.top = `${y}px`;
+            snowflake.style.opacity = opacity;
+            snowflake.style.animationDuration = `${duration}s`;
+            
+            document.body.appendChild(snowflake);
+            
+            // Remove snowflake after animation completes
+            setTimeout(() => {
+                if (snowflake && snowflake.parentNode) {
+                    snowflake.remove();
+                }
+            }, duration * 1000);
+            
+            // Add horizontal movement
+            let currentX = x;
+            const moveInterval = setInterval(() => {
+                if (snowflake && snowflake.parentNode) {
+                    currentX += (Math.random() - 0.5) * 2;
+                    snowflake.style.left = `${currentX}px`;
+                } else {
+                    clearInterval(moveInterval);
+                }
+            }, 100);
+        }
+
+        // Create snowflakes on mouse move
+        document.addEventListener('mousemove', function(e) {
+            const now = Date.now();
+            // Create snowflakes more frequently
+            if (Math.random() > 0.5) {
+                createSnowflake(e.clientX, e.clientY);
+            }
+        });
+
+ // Projects button click with improved transitions
+document.getElementById('projects-button').addEventListener('click', function() {
+    // Show loading indicator
+    loading.style.display = 'block';
+    
+    // Fade out profile
+    document.getElementById('profile').classList.remove('visible');
+    
+    setTimeout(() => {
+        // Show projects section
+        document.getElementById('projects').style.display = 'block';
+        document.getElementById('back-button').style.display = 'block';
+        
+        // Hide loading indicator
+        loading.style.display = 'none';
+    }, 300); // Faster transition
+});
+
+// Go back to profile when back button is clicked
+document.getElementById('back-button').addEventListener('click', function() {
+    // Show loading indicator
+    loading.style.display = 'block';
+    
+    document.getElementById('projects').style.display = 'none';
+    document.getElementById('back-button').style.display = 'none';
+    
+    setTimeout(() => {
+        document.getElementById('profile').classList.add('visible');
+        // Hide loading indicator
+        loading.style.display = 'none';
+        
+        setTimeout(() => {
+            bioText.classList.add('typing');
+        }, 1000);
+    }, 300); // Faster transition
+});
+        // Projects button click
+        document.getElementById('projects-button').addEventListener('click', function() {
+            // Show projects section
+            document.getElementById('profile').classList.remove('visible');
+            document.getElementById('projects').style.display = 'block';
+            document.getElementById('back-button').style.display = 'block';
+        });
+
+        // Go back to profile when back button is clicked
+        document.getElementById('back-button').addEventListener('click', function() {
+            document.getElementById('projects').style.display = 'none';
+            document.getElementById('back-button').style.display = 'none';
+            document.getElementById('profile').classList.add('visible');
+        });
+
+        // Clean up any lingering snowflakes when page changes to avoid memory leaks
+        function removeAllSnowflakes() {
+            const snowflakes = document.querySelectorAll('.snowflake');
+            snowflakes.forEach(snowflake => snowflake.remove());
+        }
+
+        // Add event listeners to clean up snowflakes
+        document.getElementById('projects-button').addEventListener('click', removeAllSnowflakes);
+        document.getElementById('back-button').addEventListener('click', removeAllSnowflakes);
+	// Project card click event handlers
+document.querySelectorAll('.project-card').forEach(card => {
+    card.addEventListener('click', function() {
+        const projectId = this.getAttribute('data-project');
+        const projectDetailElement = document.getElementById(`project-${projectId}`);
+        
+        if (projectDetailElement) {
+            // Show overlay
+            document.getElementById('overlay').style.display = 'block';
+            
+            // Show project details
+            projectDetailElement.style.display = 'block';
+            
+            // Add animation class if desired
+            projectDetailElement.classList.add('active');
+        }
+    });
+});
+
+// Close button for project details
+document.querySelectorAll('.project-details-close').forEach(button => {
+    button.addEventListener('click', function() {
+        const projectId = this.getAttribute('data-close');
+        const projectDetailElement = document.getElementById(projectId);
+        
+        if (projectDetailElement) {
+            // Hide project details
+            projectDetailElement.style.display = 'none';
+            projectDetailElement.classList.remove('active');
+            
+            // Hide overlay
+            document.getElementById('overlay').style.display = 'none';
+        }
+    });
+});
+
+// Skill tag click event handlers
+document.querySelectorAll('.skill-tag').forEach(tag => {
+    tag.addEventListener('click', function() {
+        const skillId = this.getAttribute('data-skill');
+        const skillDetailElement = document.getElementById(`skill-${skillId}`);
+        
+        if (skillDetailElement) {
+            // Show overlay
+            document.getElementById('overlay').style.display = 'block';
+            
+            // Show skill details
+            skillDetailElement.style.display = 'block';
+        }
+    });
+});
+
+// Close button for skill details
+document.querySelectorAll('.skill-details-close').forEach(button => {
+    button.addEventListener('click', function() {
+        const skillId = this.getAttribute('data-close');
+        const skillDetailElement = document.getElementById(`skill-${skillId}`);
+        
+        if (skillDetailElement) {
+            // Hide skill details
+            skillDetailElement.style.display = 'none';
+            
+            // Hide overlay
+            document.getElementById('overlay').style.display = 'none';
+        }
+    });
+});
+
+// Close modal when clicking on overlay
+document.getElementById('overlay').addEventListener('click', function() {
+    // Hide all project and skill details
+    document.querySelectorAll('.project-details, .skill-details').forEach(element => {
+        element.style.display = 'none';
+    });
+    
+    // Hide overlay
+    this.style.display = 'none';
+});    
+</script>
+</body>
+</html>
