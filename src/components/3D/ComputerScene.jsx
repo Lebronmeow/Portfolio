@@ -1194,33 +1194,67 @@ function WaypointMarker({ position, number }) {
   );
 }
 
-// ─── Reference Waypoints (numbered markers for planning the drift path) ──
-function ReferenceWaypoints() {
-  // Points around the desk in a rough circle, labeled 1-8
-  const points = [
-    { x: -4.0, z: -3.5, n: 1 },  // Start (car's position)
-    { x: -4.5, z: 0.0, n: 2 },   // Left of desk
-    { x: -3.0, z: 3.0, n: 3 },   // Front-left
-    { x: 0.0, z: 4.0, n: 4 },    // Front-center (in front of keyboard)
-    { x: 3.0, z: 3.5, n: 5 },    // Front-right
-    { x: 4.5, z: 0.5, n: 6 },    // Right of desk
-    { x: 3.0, z: -2.5, n: 7 },   // Back-right
-    { x: 0.0, z: -4.0, n: 8 },   // Behind desk
-    { x: -2.0, z: -4.5, n: 9 },  // Back-left
-    { x: -4.0, z: -3.5, n: 10 }, // Back to start
-  ];
+// ─── Interactive Waypoint Placer ──────────────────────────────────────
+function WaypointPlacer({ waypoints, setWaypoints }) {
+  const { raycaster, pointer, camera, scene } = useThree();
+
+  const handleClick = (e) => {
+    e.stopPropagation();
+    raycaster.setFromCamera(pointer, camera);
+    const intersects = raycaster.intersectObjects(scene.children, true);
+    for (const hit of intersects) {
+      const p = hit.point;
+      if (Math.abs(p.y) < 0.5) {
+        setWaypoints(prev => [...prev, { x: Math.round(p.x * 10) / 10, z: Math.round(p.z * 10) / 10 }]);
+        break;
+      }
+    }
+  };
+
+  // Listen for C key to clear, Escape to finish
+  useEffect(() => {
+    const handleKey = (e) => {
+      if (e.key === 'c' || e.key === 'C') setWaypoints([]);
+    };
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  }, [setWaypoints]);
 
   return (
     <group>
-      {points.map((p) => (
-        <WaypointMarker key={p.n} position={[p.x, p.z]} number={p.n} />
+      <mesh
+        position={[0, -0.02, 0]}
+        rotation={[-Math.PI / 2, 0, 0]}
+        onClick={handleClick}
+        onPointerOver={() => { document.body.style.cursor = 'crosshair'; }}
+        onPointerOut={() => { document.body.style.cursor = 'auto'; }}
+      >
+        <planeGeometry args={[40, 40]} />
+        <meshBasicMaterial transparent opacity={0} side={THREE.DoubleSide} />
+      </mesh>
+
+      {waypoints.map((wp, i) => (
+        <WaypointMarker key={i} position={[wp.x, wp.z]} number={i + 1} />
       ))}
+
+      <Text
+        position={[0, 4.5, 0]}
+        fontSize={0.3}
+        color="#00ff88"
+        anchorX="center"
+        anchorY="middle"
+        frustumCulled={false}
+      >
+        {`Click floor to place waypoints (${waypoints.length} placed) — C to clear`}
+      </Text>
     </group>
   );
 }
 
 // ─── Main Export ──────────────────────────────────────────────────────────────
 export default function ComputerScene({ onEnter, isZoomedIn }) {
+  const [waypoints, setWaypoints] = useState([]);
+
   return (
     <Canvas
       shadows
@@ -1254,14 +1288,14 @@ export default function ComputerScene({ onEnter, isZoomedIn }) {
 
       <FloorLabels />
 
-      {/* Reference markers around the desk */}
-      <ReferenceWaypoints />
+      {/* Click floor to place waypoints */}
+      <WaypointPlacer waypoints={waypoints} setWaypoints={setWaypoints} />
 
       <Suspense fallback={null}>
         <CatModel />
       </Suspense>
       <Suspense fallback={null}>
-        <PorscheModel waypoints={[]} />
+        <PorscheModel waypoints={waypoints} />
       </Suspense>
 
       <HoverHint position={[4.57, 0.5, -0.30]} text="🐱 pet the cat 🐱" />
