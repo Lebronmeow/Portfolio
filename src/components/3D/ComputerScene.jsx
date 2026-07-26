@@ -1037,17 +1037,23 @@ function PorscheModel({ waypoints }) {
       }
 
       // Add the original start position as the final park point
-      const path = [...waypoints, { x: orig.x, z: orig.z }];
-      // Drift angle offset for each waypoint segment (0 = straight, positive = drift left, negative = drift right)
-      // These create the specific orientations the user wants
+      // Add an intermediate "forward" point between 1 and 2
+      // so the car goes forward first, then turns right to reach waypoint 2
+      const wp1 = waypoints[0];
+      const wp2 = waypoints[1];
+      const forwardPoint = { x: wp1.x, z: wp1.z + 1.5 }; // straight ahead from start
+      const path = [wp1, forwardPoint, ...waypoints.slice(1), { x: orig.x, z: orig.z }];
+
+      // Drift angle offset for each waypoint segment
       const driftAngles = path.map((wp, i) => {
         if (i === 0) return 0;
-        if (i === 1) return -0.3;    // 1→2: slight left
-        if (i === 2) return 0.6;     // 2→3: drift (rear toward camera)
-        if (i === 3) return -0.2;    // 3→4: subtle left tilt
-        if (i === 4) return 0.3;     // 4→5: slight right
-        if (i === 5) return -0.2;    // 5→6: slight left
-        if (i === 6) return 0.4;     // 6→7: drift right
+        if (i === 1) return 0.2;     // forward: slight drift
+        if (i === 2) return -0.3;    // 2→3: slight right turn
+        if (i === 3) return 0.6;     // 3→4: drift
+        if (i === 4) return -0.2;    // 4→5: subtle left
+        if (i === 5) return 0.3;     // 5→6: slight right
+        if (i === 6) return -0.2;    // 6→7: subtle left
+        if (i === 7) return 0.4;     // 7→8: drift right
         return 0.15;                  // others: subtle drift
       });
 
