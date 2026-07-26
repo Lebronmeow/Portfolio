@@ -1064,7 +1064,7 @@ function PorscheModel() {
 
       // Drift angle per segment — creates visible drift effect
       // 0 = normal, 0.8+ = rear sliding out dramatically
-      const driftBySeg = [0, 0, 1.0, 3.0, 4.8, 6.2, 4.0, 0.2, 0, 0, 0];
+      const driftBySeg = [0, 1.0, 3.0, 4.8, 6.2, 4.0, 0.2, 0, 0];
       const targetDrift = driftBySeg[Math.min(idx + 1, driftBySeg.length - 1)] || 0;
       // Add oscillation within segment for natural drift feel
       const osc = Math.sin(frac * Math.PI * 2) * 0.2;
@@ -1190,16 +1190,14 @@ function WaypointMarker({ position, number }) {
 
 // ─── Final Drift Path (hardcoded from user's waypoints) ────────────
 const DRIFT_PATH_POINTS = [
-  { x: -4.8, z: -3.0 },   // 1
-  { x: -5.0, z: 2.0 },    // 2
-  { x: -2.9, z: 8.0 },    // 3
-  { x: 2.1, z: 11.0 },    // 4
-  { x: 7.4, z: 9.0 },     // 5
-  { x: 12.7, z: 2.0 },    // 6
-  { x: 11.7, z: -7.0 },   // 7
-  { x: 5.7, z: -12.0 },   // 8
-  { x: -1.3, z: -11.0 },  // 9
-  { x: -5.2, z: -11.0 },  // 10
+  { x: -5.0, z: 2.0 },    // 1 (was 2)
+  { x: -2.9, z: 8.0 },    // 2 (was 3)
+  { x: 2.1, z: 11.0 },    // 3 (was 4)
+  { x: 7.4, z: 9.0 },     // 4 (was 5)
+  { x: 12.7, z: 2.0 },    // 5 (was 6)
+  { x: 11.7, z: -7.0 },   // 6 (was 7)
+  { x: 5.7, z: -12.0 },   // 7 (was 8)
+  { x: -1.3, z: -11.0 },  // 8 (was 9)
 ];
 
 // ─── Interactive Waypoint Placer ────────────────────────────────────
