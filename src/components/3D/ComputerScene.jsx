@@ -1030,57 +1030,38 @@ function PorscheModel() {
         },
       });
 
-      // Simple drift sweep: forward → drift across front of keyboard → return
-      const driftPath = [
-        { x: orig.x, z: orig.z },           // Start
-        { x: orig.x, z: -1.5 },             // Forward a bit
-        { x: -2.0, z: 1.5 },                // Start drifting right
-        { x: 0.0, z: 3.0 },                 // Front of keyboard, mid-drift
-        { x: 2.5, z: 2.0 },                 // Right side, drifting
-        { x: 3.5, z: 0.0 },                 // End of drift
-        { x: 1.0, z: -2.0 },                // Heading back
-        { x: orig.x, z: orig.z },           // Return to start
-      ];
+      // Wide ellipse drift around the front of the desk
+      const CX = 0.0, CZ = 1.0;  // Center of ellipse
+      const RX = 4.5, RZ = 4.0;  // Radii
+      const startAngle = Math.atan2(orig.z - CZ, orig.x - CX);
+      const ellipseState = { angle: startAngle, prevX: orig.x, prevZ: orig.z };
 
-      // Rotation at each point (car faces direction of travel + drift angle)
-      const pathDuration = 5.0;
-      const pathState = { progress: 0, prevX: orig.x, prevZ: orig.z, prevRot: 0 };
-
-      tl.to(pathState, {
-        progress: 1,
-        duration: pathDuration,
+      tl.to(ellipseState, {
+        angle: startAngle + Math.PI * 2,
+        duration: 5.5,
         ease: 'none',
         onUpdate: () => {
-          const p = pathState.progress;
-          const segCount = driftPath.length - 1;
-          const rawIdx = p * segCount;
-          const idx = Math.min(Math.floor(rawIdx), segCount - 1);
-          const frac = rawIdx - idx;
-          const smoothFrac = frac * frac * (3 - 2 * frac);
-
-          const from = driftPath[idx];
-          const to = driftPath[idx + 1];
-          const newX = from.x + (to.x - from.x) * smoothFrac;
-          const newZ = from.z + (to.z - from.z) * smoothFrac;
+          const a = ellipseState.angle;
+          // Ellipse position (smooth continuous curve)
+          const newX = CX + Math.cos(a) * RX;
+          const newZ = CZ + Math.sin(a) * RZ;
 
           // Velocity direction
-          const vx = newX - pathState.prevX;
-          const vz = newZ - pathState.prevZ;
+          const vx = newX - ellipseState.prevX;
+          const vz = newZ - ellipseState.prevZ;
           const vLen = Math.sqrt(vx * vx + vz * vz);
 
           if (vLen > 0.001) {
-            // Direction of travel
             const velAngle = Math.atan2(vz, vx);
-            // Drift angle: more drift when turning, less when going straight
-            const driftAmount = 0.6 + Math.sin(p * Math.PI * 2) * 0.4;
-            // Car faces direction of travel + drift angle (rear slides out)
-            target.rotation.y = velAngle + Math.PI / 2 + Math.PI + driftAmount;
+            // Smooth drift angle that peaks on the sides, minimal at front/back
+            const driftAngle = 0.3 + Math.abs(Math.sin(a)) * 0.6;
+            target.rotation.y = velAngle + Math.PI / 2 + Math.PI + driftAngle;
           }
 
           target.position.x = newX;
           target.position.z = newZ;
-          pathState.prevX = newX;
-          pathState.prevZ = newZ;
+          ellipseState.prevX = newX;
+          ellipseState.prevZ = newZ;
         },
       }, 0.5);
     }, ENGINE_START_DELAY);
