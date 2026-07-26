@@ -916,18 +916,21 @@ function CatModel() {
 
 
 
-// ─── Porsche Engine Sound ──────────────────────────────────────────────
-const PORSCHE_ENGINE_URL = 'https://www.myinstants.com/media/sounds/porsche-cayman-s-v2.mp3';
-const porscheAudio = new Audio(PORSCHE_ENGINE_URL);
-porscheAudio.volume = 0.5;
-porscheAudio.preload = 'auto';
+// ─── Porsche Engine Sounds ────────────────────────────────────────────
+const PORSCHE_START_URL = 'https://soundfxcenter.com/transport/car/8d82b5_Porsche_Start_Sound_Effect.mp3';
+const PORSCHE_MOVE_URL = 'https://soundfxcenter.com/transport/car/8d82b5_Porsche_Move_Sound_Effect.mp3';
+const porscheStartAudio = new Audio(PORSCHE_START_URL);
+porscheStartAudio.volume = 0.5;
+porscheStartAudio.preload = 'auto';
+const porscheMoveAudio = new Audio(PORSCHE_MOVE_URL);
+porscheMoveAudio.volume = 0.4;
+porscheMoveAudio.preload = 'auto';
 
-function playPorscheEngine() {
-  try {
-    const clone = porscheAudio.cloneNode();
-    clone.volume = 0.5;
-    clone.play().catch(() => {});
-  } catch (e) { /* silent */ }
+function playPorscheStart() {
+  try { porscheStartAudio.cloneNode().play().catch(() => {}); } catch (e) {}
+}
+function playPorscheMove() {
+  try { porscheMoveAudio.cloneNode().play().catch(() => {}); } catch (e) {}
 }
 
 // ─── Porsche Model with click-to-drift animation ───────────────────────
@@ -979,24 +982,25 @@ function PorscheModel() {
       }
     });
 
-    // 2. Play engine sound
-    playPorscheEngine();
+    // 2. Play engine sounds
+    playPorscheStart();
+    setTimeout(() => playPorscheMove(), 300);
 
-    // 3. Smooth circular drift using GSAP onUpdate
+    // 3. Natural RC drift animation
     const CIRCLE_CENTER = { x: 1.5, z: 0.5 };
     const RADIUS = 5.5;
-    const DRIFT_TIME = 6;
+    const DRIFT_TIME = 7;
+    const DRIFT_ANGLE = 0.35; // How much the car is angled during drift
 
     // Animate a virtual angle from 0 to 2π
     const driftState = { angle: 0 };
+    let lastAngle = 0;
 
-    // First: move to start of circle
     const startAngle = Math.atan2(orig.z - CIRCLE_CENTER.z, orig.x - CIRCLE_CENTER.x);
     const startRot = startAngle + Math.PI / 2;
 
     const tl = gsap.timeline({
       onComplete: () => {
-        // Turn off headlights
         headlightsRef.current.forEach((mesh) => {
           if (mesh.material) {
             const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
@@ -1019,41 +1023,50 @@ function PorscheModel() {
     tl.to(target.position, {
       x: entryX,
       z: entryZ,
-      duration: 0.6,
+      duration: 0.5,
       ease: 'power2.out',
     }, 0)
     .to(target.rotation, {
       y: startRot,
-      duration: 0.4,
+      duration: 0.3,
       ease: 'power2.out',
     }, 0);
 
-    // Smooth circular drift — animate the angle
+    // Smooth circular drift with drift angle offset
     tl.to(driftState, {
       angle: Math.PI * 2,
       duration: DRIFT_TIME,
       ease: 'none',
       onUpdate: () => {
         const a = driftState.angle;
+        const delta = a - lastAngle;
+        lastAngle = a;
+
+        // Position on circle
         target.position.x = CIRCLE_CENTER.x + Math.cos(a) * RADIUS;
         target.position.z = CIRCLE_CENTER.z + Math.sin(a) * RADIUS;
-        // Face direction of travel (tangent to circle)
-        target.rotation.y = a + Math.PI / 2;
-      },
-    }, 0.6);
 
-    // Return to original position
+        // Natural drift angle: face tangent to circle + drift offset
+        // The drift offset makes the car's rear slide out
+        const tangent = a + Math.PI / 2;
+        // Add drift angle - car faces slightly into the turn (countersteer)
+        const driftOffset = Math.sin(a) * 0.15;
+        target.rotation.y = tangent + DRIFT_ANGLE + driftOffset;
+      },
+    }, 0.5);
+
+    // Return to original position in a smooth line
     tl.to(target.position, {
       x: orig.x,
       z: orig.z,
-      duration: 0.8,
+      duration: 0.7,
       ease: 'power2.inOut',
-    }, DRIFT_TIME + 0.8)
+    }, DRIFT_TIME + 0.7)
     .to(target.rotation, {
       y: origRot,
-      duration: 0.5,
+      duration: 0.4,
       ease: 'power2.out',
-    }, DRIFT_TIME + 0.8);
+    }, DRIFT_TIME + 0.7);
   };
 
   return (
