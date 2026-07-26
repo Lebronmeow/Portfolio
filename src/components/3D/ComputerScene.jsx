@@ -1036,25 +1036,24 @@ function PorscheModel() {
         },
       });
 
-      // Phase 1: Move forward (toward camera) and slightly right, away from desk
+      // Phase 1: Sweep right across the front of the desk (in front of keyboard)
+      const frontX = 2.0;
+      const frontZ = 3.0;
+
       tl.to(target.position, {
-        x: orig.x + 1.0,
-        z: orig.z + 2.0,
+        x: frontX,
+        z: frontZ,
         duration: PHASE1_TIME,
         ease: 'power2.out',
       }, 0)
-      // At the same time, rotate so the rear faces the user (camera)
       .to(target.rotation, {
-        y: 0.5,
-        duration: PHASE1_TIME * 0.6,
+        y: 0.2,
+        duration: PHASE1_TIME * 0.5,
         ease: 'power2.out',
       }, 0);
 
-      // Phase 2: Wide 360 circle behind the desk
-      const circleStartAngle = Math.atan2(
-        (orig.z + 2.0) - CIRCLE_CENTER.z,
-        (orig.x + 1.0) - CIRCLE_CENTER.x
-      );
+      // Phase 2: Wide 360 circle around the whole scene
+      const circleStartAngle = Math.atan2(frontZ - CIRCLE_CENTER.z, frontX - CIRCLE_CENTER.x);
 
       tl.to(driftState, {
         angle: circleStartAngle + Math.PI * 2,
@@ -1064,7 +1063,6 @@ function PorscheModel() {
           const a = driftState.angle;
           target.position.x = CIRCLE_CENTER.x + Math.cos(a) * RADIUS;
           target.position.z = CIRCLE_CENTER.z + Math.sin(a) * RADIUS;
-          // Face tangent to circle + drift angle
           const tangent = a + Math.PI / 2;
           target.rotation.y = tangent + 0.3;
         },
