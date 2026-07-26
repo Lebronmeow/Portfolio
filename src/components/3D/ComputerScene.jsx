@@ -83,20 +83,21 @@ function MainModel({ onEnter }) {
   const lastHovered = useRef(null);
   const rayTick = useRef(0);
 
-  // CRT Flicker Animation — fast random flicker
-  useFrame(() => {
+  // CRT Flicker Animation — smooth natural CRT pulse
+  useFrame((state) => {
     if (!screenMatRef.current && !textRef.current) return;
-    // Random flicker pattern: mostly bright with quick dark flashes
-    const flash = Math.random() < 0.06 ? 0.08 : 1.0;
-    const dim = 0.5 + Math.random() * 0.5;
-    const brightness = flash * dim;
+    const t = state.clock.elapsedTime;
+    // Gentle sine wave with subtle micro-flicker
+    const pulse = Math.sin(t * 8) * 0.12 + 0.88;
+    const micro = Math.random() < 0.04 ? (Math.random() - 0.5) * 0.1 : 0;
+    const brightness = Math.max(0.5, Math.min(1.0, pulse + micro));
 
     if (screenMatRef.current) {
-      const val = brightness * 0.5;
-      screenMatRef.current.color.setRGB(val, val, val * 1.2);
+      const val = brightness * 0.35;
+      screenMatRef.current.color.setRGB(val, val, val * 1.15);
     }
     if (textRef.current) {
-      textRef.current.fillOpacity = Math.max(0.08, brightness);
+      textRef.current.fillOpacity = Math.max(0.5, brightness);
     }
   });
 
@@ -144,7 +145,7 @@ function MainModel({ onEnter }) {
           }
           const pos = new THREE.Vector3();
           (flowerGroup.userData?.isFlowerGroup ? flowerGroup : obj).getWorldPosition(pos);
-          pos.y += 3.0;
+          pos.y += 3.5;
           setHintState({ text: '✦ it might spin ✦', position: pos.toArray() });
         } else {
           let isFlowerDescendant = false;
@@ -161,7 +162,7 @@ function MainModel({ onEnter }) {
             }
             const pos = new THREE.Vector3();
             (flowerGroup.userData?.isFlowerGroup ? flowerGroup : obj).getWorldPosition(pos);
-            pos.y += 3.0;
+            pos.y += 3.5;
             setHintState({ text: '✦ it might spin ✦', position: pos.toArray() });
           } else {
             lastHovered.current = null;
