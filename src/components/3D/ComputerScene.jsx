@@ -935,7 +935,7 @@ function PorscheModel() {
     <group
       ref={groupRef}
       position={[-4.0, 0.25, -3.5]}
-      rotation={[0, 3.0, 0]}
+      rotation={[0, 2.5, 0]}
       scale={[0.5, 0.5, 0.5]}
     >
       <primitive object={scene} />
