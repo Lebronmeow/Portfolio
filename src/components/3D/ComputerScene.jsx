@@ -1355,7 +1355,7 @@ function WaypointPlacer({ waypoints, setWaypoints }) {
       </Text>
       {showCoords && waypoints.length > 0 && (
         <Text
-          position={[-7, 2.5, 0]}
+          position={[-7, 4.0, 0]}
           fontSize={0.22}
           color="#ffdd44"
           anchorX="left"
