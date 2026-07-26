@@ -917,7 +917,7 @@ function CatModel() {
 
 
 // ─── Porsche Engine Sound ──────────────────────────────────────────────
-const PORSCHE_ENGINE_URL = 'https://www.myinstants.com/media/sounds/porsche-launch-control.mp3';
+const PORSCHE_ENGINE_URL = 'https://www.myinstants.com/media/sounds/porsche-cayman-s-v2.mp3';
 const porscheAudio = new Audio(PORSCHE_ENGINE_URL);
 porscheAudio.volume = 0.5;
 porscheAudio.preload = 'auto';
@@ -938,6 +938,7 @@ function PorscheModel() {
   const originalPos = useRef({ x: -4.0, y: 0.32, z: -3.5 });
   const originalRot = useRef(2.5);
   const headlightsRef = useRef([]);
+  const glowRef = useRef(null);
 
   // Find headlight meshes and store references
   useEffect(() => {
@@ -965,14 +966,14 @@ function PorscheModel() {
     const orig = originalPos.current;
     const origRot = originalRot.current;
 
-    // 1. Headlights on — make them glow
+    // 1. Headlights on with glow
     headlightsRef.current.forEach((mesh) => {
       if (mesh.material) {
         const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
         mats.forEach((mat) => {
           if (mat && mat.emissive) {
             mat.emissive.setHex(0xffdd44);
-            mat.emissiveIntensity = 2.0;
+            mat.emissiveIntensity = 3.0;
           }
         });
       }
@@ -981,7 +982,18 @@ function PorscheModel() {
     // 2. Play engine sound
     playPorscheEngine();
 
-    // 3. Drift animation timeline
+    // 3. Smooth circular drift using GSAP onUpdate
+    const CIRCLE_CENTER = { x: 1.5, z: 0.5 };
+    const RADIUS = 5.5;
+    const DRIFT_TIME = 6;
+
+    // Animate a virtual angle from 0 to 2π
+    const driftState = { angle: 0 };
+
+    // First: move to start of circle
+    const startAngle = Math.atan2(orig.z - CIRCLE_CENTER.z, orig.x - CIRCLE_CENTER.x);
+    const startRot = startAngle + Math.PI / 2;
+
     const tl = gsap.timeline({
       onComplete: () => {
         // Turn off headlights
@@ -1000,43 +1012,35 @@ function PorscheModel() {
       },
     });
 
-    // Path: drift around the scene in a wide arc
-    const SCENE_RADIUS = 6.5;
-    const ARC_CENTER = { x: 0, z: 0.5 };
-    const STEPS = 8;
+    // Move to circle start point
+    const entryX = CIRCLE_CENTER.x + Math.cos(startAngle) * RADIUS;
+    const entryZ = CIRCLE_CENTER.z + Math.sin(startAngle) * RADIUS;
 
-    // First, move forward slightly
     tl.to(target.position, {
-      x: orig.x + 1.5,
-      z: orig.z + 1.0,
-      duration: 0.8,
+      x: entryX,
+      z: entryZ,
+      duration: 0.6,
       ease: 'power2.out',
     }, 0)
     .to(target.rotation, {
-      y: origRot - 0.5,
-      duration: 0.5,
+      y: startRot,
+      duration: 0.4,
       ease: 'power2.out',
     }, 0);
 
-    // Drift around in a circle — each step rotates and moves
-    for (let i = 0; i < STEPS; i++) {
-      const angle = ((i + 1) / STEPS) * Math.PI * 2;
-      const px = ARC_CENTER.x + Math.cos(angle) * SCENE_RADIUS;
-      const pz = ARC_CENTER.z + Math.sin(angle) * SCENE_RADIUS;
-      const rot = angle + 1.57; // face tangent to circle
-
-      tl.to(target.position, {
-        x: px,
-        z: pz,
-        duration: 0.5,
-        ease: 'power2.inOut',
-      }, i * 0.5 + 0.8)
-      .to(target.rotation, {
-        y: rot,
-        duration: 0.4,
-        ease: 'power2.inOut',
-      }, i * 0.5 + 0.8);
-    }
+    // Smooth circular drift — animate the angle
+    tl.to(driftState, {
+      angle: Math.PI * 2,
+      duration: DRIFT_TIME,
+      ease: 'none',
+      onUpdate: () => {
+        const a = driftState.angle;
+        target.position.x = CIRCLE_CENTER.x + Math.cos(a) * RADIUS;
+        target.position.z = CIRCLE_CENTER.z + Math.sin(a) * RADIUS;
+        // Face direction of travel (tangent to circle)
+        target.rotation.y = a + Math.PI / 2;
+      },
+    }, 0.6);
 
     // Return to original position
     tl.to(target.position, {
@@ -1044,17 +1048,12 @@ function PorscheModel() {
       z: orig.z,
       duration: 0.8,
       ease: 'power2.inOut',
-    }, STEPS * 0.5 + 1.0)
+    }, DRIFT_TIME + 0.8)
     .to(target.rotation, {
       y: origRot,
       duration: 0.5,
       ease: 'power2.out',
-    }, STEPS * 0.5 + 1.0)
-    .to(target.position, {
-      y: orig.y,
-      duration: 0.3,
-      ease: 'power1.out',
-    }, 0); // keep y stable
+    }, DRIFT_TIME + 0.8);
   };
 
   return (
