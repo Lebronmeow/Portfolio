@@ -942,6 +942,7 @@ function PorscheModel() {
   const originalRot = useRef(2.5);
   const headlightsRef = useRef([]);
   const wheelsRef = useRef([]);
+  const wheelGroupRef = useRef(null);
 
   // Find headlight and wheel meshes
   useEffect(() => {
@@ -956,9 +957,13 @@ function PorscheModel() {
         if (name.includes('vehiclelights') || (name.includes('lights') && name.includes('lod0'))) {
           lights.push(obj);
         }
-        if (name.includes('wheel') || name.includes('tyre') || name.includes('ssr')) {
+        if (name.includes('tyre') || name.includes('ssr')) {
           wheels.push(obj);
         }
+      }
+      // Find the wheel group (parent of wheel meshes)
+      if (obj.isGroup && obj.name?.toLowerCase() === 'wheel') {
+        wheelGroupRef.current = obj;
       }
     });
     headlightsRef.current = lights;
@@ -1005,12 +1010,12 @@ function PorscheModel() {
       const PHASE3_TIME = 1.0;
 
       // The rear kick-out point (where the car's rear faces the user)
-      const kickX = orig.x + 1.5;
-      const kickZ = orig.z + 1.0;
+      const kickX = orig.x + 2.5;
+      const kickZ = orig.z + 1.5;
 
-      // Circle behind the desk
-      const CIRCLE_CENTER = { x: -1.0, z: -4.5 };
-      const RADIUS = 3.5;
+      // Wide circle behind the desk
+      const CIRCLE_CENTER = { x: -0.5, z: -5.0 };
+      const RADIUS = 5.5;
 
       const driftState = { angle: 0 };
 
@@ -1063,9 +1068,12 @@ function PorscheModel() {
           const tangent = a + Math.PI / 2;
           target.rotation.y = tangent + 0.35;
 
-          // Spin wheels on the correct axis
+          // Spin wheels — rotate the wheel group for rolling + steering
+          if (wheelGroupRef.current) {
+            wheelGroupRef.current.rotation.x += 0.3;
+          }
           wheelsRef.current.forEach((wheel) => {
-            wheel.rotation.z += 0.2;
+            wheel.rotation.x += 0.3;
           });
         },
       }, PHASE1_TIME);
