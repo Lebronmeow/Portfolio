@@ -1237,6 +1237,7 @@ function WaypointPlacer({ waypoints, setWaypoints }) {
   useEffect(() => {
     const handleKey = (e) => {
       if (e.key === 'c' || e.key === 'C') setWaypoints([]);
+      if (e.key === 'z' || e.key === 'Z') setWaypoints(prev => prev.slice(0, -1));
     };
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
@@ -1267,7 +1268,7 @@ function WaypointPlacer({ waypoints, setWaypoints }) {
         anchorY="middle"
         frustumCulled={false}
       >
-        {`Click floor to place waypoints (${waypoints.length} placed) — C to clear`}
+        {`Click floor to place waypoints (${waypoints.length}) — Z undo  |  C clear`}
       </Text>
     </group>
   );
