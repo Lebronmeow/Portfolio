@@ -1062,18 +1062,20 @@ function PorscheModel() {
     if (vLen > 0.001) {
       const velAngle = Math.atan2(vz, vx);
 
-      // Drift angle per segment (creates visible drift effect)
-      // 0 = normal, 0.5+ = rear sliding out
-      const driftBySeg = [0, 0, 0.5, 0.9, 0.7, 0.4, 0.2, 0.1, 0, 0, 0];
+      // Drift angle per segment — creates visible drift effect
+      // 0 = normal, 0.8+ = rear sliding out dramatically
+      const driftBySeg = [0, 0, 0.8, 1.2, 0.8, 0.4, 0.2, 0.1, 0, 0, 0];
       const targetDrift = driftBySeg[Math.min(idx + 1, driftBySeg.length - 1)] || 0;
-      sim.driftAngle += (targetDrift - sim.driftAngle) * 0.1;
+      // Add oscillation within segment for natural drift feel
+      const osc = Math.sin(frac * Math.PI * 2) * 0.15;
+      sim.driftAngle += (targetDrift + osc - sim.driftAngle) * 0.15;
 
       // Heading = velocity direction + 90° for car model + drift offset
       const targetHeading = velAngle + Math.PI / 2 + sim.driftAngle;
       let hDiff = targetHeading - sim.heading;
       if (hDiff > Math.PI) hDiff -= Math.PI * 2;
       if (hDiff < -Math.PI) hDiff += Math.PI * 2;
-      sim.heading += hDiff * 0.15;
+      sim.heading += hDiff * 0.1;
 
       target.rotation.y = sim.heading;
     }
