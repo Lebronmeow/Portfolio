@@ -916,20 +916,146 @@ function CatModel() {
 
 
 
-// ─── Porsche Model (local) ─────────────────────────────────────────────
+// ─── Porsche Engine Sound ──────────────────────────────────────────────
+const PORSCHE_ENGINE_URL = 'https://www.myinstants.com/media/sounds/porsche-launch-control.mp3';
+const porscheAudio = new Audio(PORSCHE_ENGINE_URL);
+porscheAudio.volume = 0.5;
+porscheAudio.preload = 'auto';
+
+function playPorscheEngine() {
+  try {
+    const clone = porscheAudio.cloneNode();
+    clone.volume = 0.5;
+    clone.play().catch(() => {});
+  } catch (e) { /* silent */ }
+}
+
+// ─── Porsche Model with click-to-drift animation ───────────────────────
 function PorscheModel() {
   const groupRef = useRef();
   const { scene } = useGLTF('/models/porsche.glb');
+  const busy = useRef(false);
+  const originalPos = useRef({ x: -4.0, y: 0.32, z: -3.5 });
+  const originalRot = useRef(2.5);
+  const headlightsRef = useRef([]);
 
+  // Find headlight meshes and store references
   useEffect(() => {
     if (!scene) return;
+    const lights = [];
     scene.traverse((obj) => {
       if (obj.isMesh) {
         obj.castShadow = true;
         obj.receiveShadow = true;
+        const name = obj.name?.toLowerCase() || '';
+        if (name.includes('vehiclelights') || (name.includes('lights') && name.includes('lod0'))) {
+          lights.push(obj);
+        }
       }
     });
+    headlightsRef.current = lights;
   }, [scene]);
+
+  const handleClick = (e) => {
+    e.stopPropagation();
+    if (!groupRef.current || busy.current) return;
+    busy.current = true;
+
+    const target = groupRef.current;
+    const orig = originalPos.current;
+    const origRot = originalRot.current;
+
+    // 1. Headlights on — make them glow
+    headlightsRef.current.forEach((mesh) => {
+      if (mesh.material) {
+        const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+        mats.forEach((mat) => {
+          if (mat && mat.emissive) {
+            mat.emissive.setHex(0xffdd44);
+            mat.emissiveIntensity = 2.0;
+          }
+        });
+      }
+    });
+
+    // 2. Play engine sound
+    playPorscheEngine();
+
+    // 3. Drift animation timeline
+    const tl = gsap.timeline({
+      onComplete: () => {
+        // Turn off headlights
+        headlightsRef.current.forEach((mesh) => {
+          if (mesh.material) {
+            const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+            mats.forEach((mat) => {
+              if (mat && mat.emissive) {
+                mat.emissive.setHex(0x000000);
+                mat.emissiveIntensity = 0;
+              }
+            });
+          }
+        });
+        busy.current = false;
+      },
+    });
+
+    // Path: drift around the scene in a wide arc
+    const SCENE_RADIUS = 6.5;
+    const ARC_CENTER = { x: 0, z: 0.5 };
+    const STEPS = 8;
+
+    // First, move forward slightly
+    tl.to(target.position, {
+      x: orig.x + 1.5,
+      z: orig.z + 1.0,
+      duration: 0.8,
+      ease: 'power2.out',
+    }, 0)
+    .to(target.rotation, {
+      y: origRot - 0.5,
+      duration: 0.5,
+      ease: 'power2.out',
+    }, 0);
+
+    // Drift around in a circle — each step rotates and moves
+    for (let i = 0; i < STEPS; i++) {
+      const angle = ((i + 1) / STEPS) * Math.PI * 2;
+      const px = ARC_CENTER.x + Math.cos(angle) * SCENE_RADIUS;
+      const pz = ARC_CENTER.z + Math.sin(angle) * SCENE_RADIUS;
+      const rot = angle + 1.57; // face tangent to circle
+
+      tl.to(target.position, {
+        x: px,
+        z: pz,
+        duration: 0.5,
+        ease: 'power2.inOut',
+      }, i * 0.5 + 0.8)
+      .to(target.rotation, {
+        y: rot,
+        duration: 0.4,
+        ease: 'power2.inOut',
+      }, i * 0.5 + 0.8);
+    }
+
+    // Return to original position
+    tl.to(target.position, {
+      x: orig.x,
+      z: orig.z,
+      duration: 0.8,
+      ease: 'power2.inOut',
+    }, STEPS * 0.5 + 1.0)
+    .to(target.rotation, {
+      y: origRot,
+      duration: 0.5,
+      ease: 'power2.out',
+    }, STEPS * 0.5 + 1.0)
+    .to(target.position, {
+      y: orig.y,
+      duration: 0.3,
+      ease: 'power1.out',
+    }, 0); // keep y stable
+  };
 
   return (
     <group
@@ -937,6 +1063,9 @@ function PorscheModel() {
       position={[-4.0, 0.32, -3.5]}
       rotation={[0, 2.5, 0]}
       scale={[0.5, 0.5, 0.5]}
+      onClick={handleClick}
+      onPointerOver={(e) => { e.stopPropagation(); document.body.style.cursor = 'pointer'; }}
+      onPointerOut={() => { document.body.style.cursor = 'auto'; }}
     >
       <primitive object={scene} />
     </group>
