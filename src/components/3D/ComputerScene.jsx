@@ -1072,7 +1072,8 @@ function PorscheModel() {
       // Handle angle wrapping
       if (dDiff > Math.PI) dDiff -= Math.PI * 2;
       if (dDiff < -Math.PI) dDiff += Math.PI * 2;
-      sim.driftAngle += dDiff * 0.25;
+      const blendRate = (idx >= 2 && idx <= 3) ? 0.5 : 0.2;
+      sim.driftAngle += dDiff * blendRate;
       // Normalize drift angle
       if (sim.driftAngle > Math.PI * 2) sim.driftAngle -= Math.PI * 2;
       if (sim.driftAngle < 0) sim.driftAngle += Math.PI * 2;
