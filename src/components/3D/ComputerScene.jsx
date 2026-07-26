@@ -1042,13 +1042,13 @@ function PorscheModel({ waypoints }) {
       // These create the specific orientations the user wants
       const driftAngles = path.map((wp, i) => {
         if (i === 0) return 0;
-        if (i === 1) return 0;       // 1→2: straight
-        if (i === 2) return 1.8;     // 2→3: rear faces camera (big drift)
-        if (i === 3) return -0.8;    // 3→4: tilted left
-        if (i === 4) return 0.5;     // 4→5: slight drift right
+        if (i === 1) return -0.4;    // 1→2: slight left while going
+        if (i === 2) return 1.0;     // 2→3: rear toward camera (not inverted)
+        if (i === 3) return -0.6;    // 3→4: tilted left
+        if (i === 4) return 0.4;     // 4→5: slight drift right
         if (i === 5) return -0.3;    // 5→6: slight left
-        if (i === 6) return 0.6;     // 6→7: drift right
-        return 0.3;                   // others: slight drift
+        if (i === 6) return 0.5;     // 6→7: drift right
+        return 0.2;                   // others: slight drift
       });
 
       const totalDist = path.reduce((acc, wp, i) => {
@@ -1095,7 +1095,7 @@ function PorscheModel({ waypoints }) {
             let headingDiff = targetHeading - waypointState.heading;
             if (headingDiff > Math.PI) headingDiff -= Math.PI * 2;
             if (headingDiff < -Math.PI) headingDiff += Math.PI * 2;
-            waypointState.heading += headingDiff * 0.12;
+            waypointState.heading += headingDiff * 0.2;
 
             // Blend drift angle toward the current segment's target
             const targetDrift = driftAngles[idx + 1] || 0;
