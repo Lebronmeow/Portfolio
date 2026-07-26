@@ -1030,58 +1030,57 @@ function PorscheModel() {
         },
       });
 
-      // Physics-based drift using slip angle calculation
-      const CIRCLE_CENTER = { x: -1.0, z: -1.0 };
-      const RADIUS = 4.0;
-      const startAngle = Math.atan2(orig.z - CIRCLE_CENTER.z, orig.x - CIRCLE_CENTER.x);
-      const K = 2.5; // Drift tuning constant (higher = easier to drift)
-      const driftState = { angle: startAngle, prevX: orig.x, prevZ: orig.z };
+      // Simple drift sweep: forward → drift across front of keyboard → return
+      const driftPath = [
+        { x: orig.x, z: orig.z },           // Start
+        { x: orig.x, z: -1.5 },             // Forward a bit
+        { x: -2.0, z: 1.5 },                // Start drifting right
+        { x: 0.0, z: 3.0 },                 // Front of keyboard, mid-drift
+        { x: 2.5, z: 2.0 },                 // Right side, drifting
+        { x: 3.5, z: 0.0 },                 // End of drift
+        { x: 1.0, z: -2.0 },                // Heading back
+        { x: orig.x, z: orig.z },           // Return to start
+      ];
 
-      tl.to(driftState, {
-        angle: startAngle + Math.PI * 2,
-        duration: 6.5,
+      // Rotation at each point (car faces direction of travel + drift angle)
+      const pathDuration = 5.0;
+      const pathState = { progress: 0, prevX: orig.x, prevZ: orig.z, prevRot: 0 };
+
+      tl.to(pathState, {
+        progress: 1,
+        duration: pathDuration,
         ease: 'none',
         onUpdate: () => {
-          const a = driftState.angle;
+          const p = pathState.progress;
+          const segCount = driftPath.length - 1;
+          const rawIdx = p * segCount;
+          const idx = Math.min(Math.floor(rawIdx), segCount - 1);
+          const frac = rawIdx - idx;
+          const smoothFrac = frac * frac * (3 - 2 * frac);
 
-          // Position on circle (this is the path the car follows)
-          const newX = CIRCLE_CENTER.x + Math.cos(a) * RADIUS;
-          const newZ = CIRCLE_CENTER.z + Math.sin(a) * RADIUS;
+          const from = driftPath[idx];
+          const to = driftPath[idx + 1];
+          const newX = from.x + (to.x - from.x) * smoothFrac;
+          const newZ = from.z + (to.z - from.z) * smoothFrac;
 
-          // 1. Velocity vector = actual movement direction
-          const vx = newX - driftState.prevX;
-          const vz = newZ - driftState.prevZ;
+          // Velocity direction
+          const vx = newX - pathState.prevX;
+          const vz = newZ - pathState.prevZ;
           const vLen = Math.sqrt(vx * vx + vz * vz);
 
           if (vLen > 0.001) {
-            // Normalized velocity direction
-            const vnx = vx / vLen;
-            const vnz = vz / vLen;
-
-            // 2. Forward vector = where the car points (tangent to circle)
-            const tangent = a + Math.PI / 2;
-            const fx = Math.cos(tangent);
-            const fz = Math.sin(tangent);
-
-            // 3. Slip angle = angle between forward and velocity
-            const dot = fx * vnx + fz * vnz;
-            const slipAngle = Math.acos(Math.max(-1, Math.min(1, dot)));
-
-            // 4. Grip modifier — as slip angle grows, grip drops
-            const G = 1 / (1 + Math.pow(K * slipAngle, 2));
-
-            // 5. The car's heading = velocity direction + slip angle * grip
-            // Low grip = more slip = rear swings out more
-            const velocityAngle = Math.atan2(vnz, vnx);
-            const driftOffset = slipAngle * (1 - G) * 0.5;
-            target.rotation.y = velocityAngle + Math.PI / 2 + Math.PI + driftOffset;
+            // Direction of travel
+            const velAngle = Math.atan2(vz, vx);
+            // Drift angle: more drift when turning, less when going straight
+            const driftAmount = 0.6 + Math.sin(p * Math.PI * 2) * 0.4;
+            // Car faces direction of travel + drift angle (rear slides out)
+            target.rotation.y = velAngle + Math.PI / 2 + Math.PI + driftAmount;
           }
 
-          // Update position
           target.position.x = newX;
           target.position.z = newZ;
-          driftState.prevX = newX;
-          driftState.prevZ = newZ;
+          pathState.prevX = newX;
+          pathState.prevZ = newZ;
         },
       }, 0.5);
     }, ENGINE_START_DELAY);
