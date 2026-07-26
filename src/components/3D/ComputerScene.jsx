@@ -1036,25 +1036,26 @@ function PorscheModel() {
         },
       });
 
-      // Phase 1: Move right and flick the rear
-      // Car moves forward-right while rotating sharply (rear swings out)
+      // Phase 1: Move forward (toward camera) and slightly right, away from desk
       tl.to(target.position, {
-        x: kickX,
-        z: kickZ,
+        x: orig.x + 1.0,
+        z: orig.z + 2.0,
         duration: PHASE1_TIME,
         ease: 'power2.out',
       }, 0)
+      // At the same time, rotate so the rear faces the user (camera)
       .to(target.rotation, {
-        y: 0.8, // Rotate so rear faces toward user
-        duration: PHASE1_TIME * 0.7,
+        y: 0.5,
+        duration: PHASE1_TIME * 0.6,
         ease: 'power2.out',
       }, 0);
 
-      // Phase 2: 360 circle behind the desk
-      // The car is now facing roughly toward the circle, begin the drift
-      const circleStartAngle = Math.atan2(kickZ - CIRCLE_CENTER.z, kickX - CIRCLE_CENTER.x);
+      // Phase 2: Wide 360 circle behind the desk
+      const circleStartAngle = Math.atan2(
+        (orig.z + 2.0) - CIRCLE_CENTER.z,
+        (orig.x + 1.0) - CIRCLE_CENTER.x
+      );
 
-      // Smoothly transition into the circle
       tl.to(driftState, {
         angle: circleStartAngle + Math.PI * 2,
         duration: PHASE2_TIME,
@@ -1063,18 +1064,9 @@ function PorscheModel() {
           const a = driftState.angle;
           target.position.x = CIRCLE_CENTER.x + Math.cos(a) * RADIUS;
           target.position.z = CIRCLE_CENTER.z + Math.sin(a) * RADIUS;
-
-          // Face tangent to circle + drift angle (rear slides out)
+          // Face tangent to circle + drift angle
           const tangent = a + Math.PI / 2;
-          target.rotation.y = tangent + 0.35;
-
-          // Spin wheels — rotate the wheel group for rolling + steering
-          if (wheelGroupRef.current) {
-            wheelGroupRef.current.rotation.x += 0.3;
-          }
-          wheelsRef.current.forEach((wheel) => {
-            wheel.rotation.x += 0.3;
-          });
+          target.rotation.y = tangent + 0.3;
         },
       }, PHASE1_TIME);
 
@@ -1087,7 +1079,7 @@ function PorscheModel() {
       }, PHASE1_TIME + PHASE2_TIME)
       .to(target.rotation, {
         y: originalRot.current,
-        duration: PHASE3_TIME * 0.6,
+        duration: PHASE3_TIME * 0.5,
         ease: 'power2.out',
       }, PHASE1_TIME + PHASE2_TIME);
     }, ENGINE_START_DELAY);
