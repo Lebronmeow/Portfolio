@@ -73,7 +73,7 @@ function isKeyboardKey(obj) {
 
 // ─── Main 3D Model with Dynamic Screen Text Overlay ──────────────────────────
 function MainModel({ onEnter }) {
-  const { gl, raycaster, pointer, camera } = useThree();
+  const { gl, raycaster, pointer, camera, scene } = useThree();
   const [model, setModel] = useState(null);
   const [screenData, setScreenData] = useState(null);
   const [hintState, setHintState] = useState(null); // { text, position }
@@ -83,48 +83,49 @@ function MainModel({ onEnter }) {
   const lastHovered = useRef(null);
   const rayTick = useRef(0);
 
-  // CRT Flicker Animation — visible CRT pulse
+  // CRT Flicker Animation — quick CRT pulse
   const flickerTick = useRef(0);
   useFrame((state) => {
     const t = state.clock.elapsedTime;
-    // Update every ~20ms for visible flicker
+    // Update every ~16ms for smooth flicker
     flickerTick.current += state.clock.getDelta();
-    if (flickerTick.current < 0.02) return;
+    if (flickerTick.current < 0.016) return;
     flickerTick.current = 0;
 
-    // Sine pulse + random voltage spikes
-    const pulse = Math.sin(t * 18) * 0.22 + 0.78;
-    const micro = Math.random() < 0.12 ? (Math.random() - 0.5) * 0.18 : 0;
-    const brightness = Math.max(0.15, Math.min(1.0, pulse + micro));
+    // Fast sine + random voltage spikes
+    const pulse = Math.sin(t * 28) * 0.28 + 0.72;
+    const micro = Math.random() < 0.15 ? (Math.random() - 0.5) * 0.22 : 0;
+    const brightness = Math.max(0.1, Math.min(1.0, pulse + micro));
 
     // Flicker the screen background
     if (screenMatRef.current) {
-      const val = brightness * 0.4;
-      screenMatRef.current.color.setRGB(val, val, val * 1.2);
+      const val = brightness * 0.45;
+      screenMatRef.current.color.setRGB(val, val, val * 1.15);
     }
     // Flicker the text opacity
     if (textRef.current) {
-      textRef.current.fillOpacity = Math.max(0.2, brightness);
+      textRef.current.fillOpacity = Math.max(0.15, brightness);
     }
   });
 
   // ─── Hover Detection via Raycasting ───────────────────────────────────
-  // Uses manual raycasting every ~100ms instead of relying on onPointerOver
-  // (which only fires once on the primitive root)
+  // Raycasts every ~50ms against model children to find hovered objects
   useFrame((state) => {
     if (!model) return;
     rayTick.current += state.clock.getDelta();
-    if (rayTick.current < 0.1) return;
+    if (rayTick.current < 0.05) return;
     rayTick.current = 0;
 
     raycaster.setFromCamera(pointer, camera);
-    const intersects = raycaster.intersectObjects(model.children, true);
+    const intersects = raycaster.intersectObjects(scene.children, true);
 
+    // Check if the first hit is part of the model (is a descendant of the loaded GLB)
     if (intersects.length > 0) {
       const obj = intersects[0].object;
       if (obj === lastHovered.current) return;
       lastHovered.current = obj;
 
+      // Only handle model-specific objects — skip floor labels, grid, etc.
       if (isStrictScreenTarget(obj)) {
         document.body.style.cursor = 'pointer';
         setHintState(null);
@@ -140,16 +141,25 @@ function MainModel({ onEnter }) {
         obj.getWorldPosition(pos);
         pos.y += 2.0;
         setHintState({ text: 'give it a spin', position: pos.toArray() });
-      } else {
-        let isFlower = obj.userData?.isFlower;
-        if (!isFlower) {
-          let p = obj.parent;
-          while (p) {
-            if (p.userData?.isFlowerGroup) { isFlower = true; break; }
-            p = p.parent;
-          }
+      } else if (obj.userData?.isFlower) {
+        document.body.style.cursor = 'grab';
+        let flowerGroup = obj;
+        while (flowerGroup.parent && !flowerGroup.parent.userData?.isFlowerGroup && flowerGroup.parent.parent) {
+          flowerGroup = flowerGroup.parent;
         }
-        if (isFlower) {
+        const pos = new THREE.Vector3();
+        (flowerGroup.userData?.isFlowerGroup ? flowerGroup : obj).getWorldPosition(pos);
+        pos.y += 3.0;
+        setHintState({ text: '✦ it might spin ✦', position: pos.toArray() });
+      } else {
+        // Check if any ancestor is a flower group
+        let isFlowerDescendant = false;
+        let p = obj.parent;
+        while (p) {
+          if (p.userData?.isFlowerGroup) { isFlowerDescendant = true; break; }
+          p = p.parent;
+        }
+        if (isFlowerDescendant) {
           document.body.style.cursor = 'grab';
           let flowerGroup = obj;
           while (flowerGroup.parent && !flowerGroup.parent.userData?.isFlowerGroup && flowerGroup.parent.parent) {
@@ -160,8 +170,12 @@ function MainModel({ onEnter }) {
           pos.y += 3.0;
           setHintState({ text: '✦ it might spin ✦', position: pos.toArray() });
         } else {
-          document.body.style.cursor = 'auto';
-          setHintState(null);
+          // Non-interactive object — clear hint but don't override cursor
+          if (lastHovered.current !== null) {
+            lastHovered.current = null;
+            document.body.style.cursor = 'auto';
+            setHintState(null);
+          }
         }
       }
     } else if (lastHovered.current !== null) {
