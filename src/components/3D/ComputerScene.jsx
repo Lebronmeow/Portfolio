@@ -1074,7 +1074,7 @@ function PorscheModel() {
             // Low grip = more slip = rear swings out more
             const velocityAngle = Math.atan2(vnz, vnx);
             const driftOffset = slipAngle * (1 - G) * 0.5;
-            target.rotation.y = velocityAngle + Math.PI / 2 + driftOffset;
+            target.rotation.y = velocityAngle + Math.PI / 2 + Math.PI + driftOffset;
           }
 
           // Update position
