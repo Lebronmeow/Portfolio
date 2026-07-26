@@ -1057,7 +1057,7 @@ function PorscheModel() {
             const velAngle = Math.atan2(vz, vx);
             // Smooth drift angle that peaks on the sides, minimal at front/back
             const driftAngle = 0.3 + Math.abs(Math.sin(a)) * 0.6;
-            target.rotation.y = velAngle + Math.PI / 2 + Math.PI + driftAngle;
+            target.rotation.y = velAngle + Math.PI / 2 + driftAngle;
           }
 
           target.position.x = newX;
@@ -1073,7 +1073,7 @@ function PorscheModel() {
     <group
       ref={groupRef}
       position={[-4.0, 0.32, -3.5]}
-      rotation={[0, 2.5 + Math.PI, 0]}
+      rotation={[0, 2.5, 0]}
       scale={[0.5, 0.5, 0.5]}
       onClick={handleClick}
       onPointerOver={(e) => { e.stopPropagation(); document.body.style.cursor = 'pointer'; }}
