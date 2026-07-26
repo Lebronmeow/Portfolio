@@ -92,17 +92,17 @@ function MainModel({ onEnter }) {
     flickerTick.current = 0;
 
     // Strong CRT flicker: sine pulse + random voltage spikes
-    const pulse = Math.sin(t * 24) * 0.25 + 0.75;
-    const micro = (Math.random() - 0.5) * 0.15;
-    const brightness = Math.max(0.1, Math.min(1.0, pulse + micro));
+    const pulse = Math.sin(t * 24) * 0.3 + 0.7;
+    const micro = (Math.random() - 0.5) * 0.2;
+    const brightness = Math.max(0.15, Math.min(1.0, pulse + micro));
 
-    // Flicker the dark screen background
+    // Flicker the screen background — visible range from dark to bright
     if (screenMatRef.current) {
-      screenMatRef.current.color.setScalar(brightness * 0.10);
+      screenMatRef.current.color.setScalar(brightness * 0.35);
     }
     // Flicker the text opacity
     if (textRef.current) {
-      textRef.current.fillOpacity = brightness;
+      textRef.current.fillOpacity = Math.max(0.2, brightness);
     }
   });
 
@@ -260,7 +260,7 @@ function MainModel({ onEnter }) {
             // ── Find the Monitor Screen mesh ──
             if (mat && !Array.isArray(mat) && mat.name === 'Monitor Screen') {
               // Replace with a plain dark CRT material (no texture needed)
-              const darkMat = new THREE.MeshBasicMaterial({ color: '#0a0a14' });
+              const darkMat = new THREE.MeshBasicMaterial({ color: '#1a1a2e' });
               darkMat.name = 'Monitor Screen';
               obj.material = darkMat;
               screenMatRef.current = darkMat;
@@ -320,7 +320,7 @@ function MainModel({ onEnter }) {
             if (Array.isArray(mat)) {
               mat.forEach((m, idx) => {
                 if (m && m.name === 'Monitor Screen') {
-                  const darkMat = new THREE.MeshBasicMaterial({ color: '#0a0a14' });
+                  const darkMat = new THREE.MeshBasicMaterial({ color: '#1a1a2e' });
                   darkMat.name = 'Monitor Screen';
                   obj.material[idx] = darkMat;
                   screenMatRef.current = darkMat;
@@ -411,12 +411,6 @@ function MainModel({ onEnter }) {
   };
 
   const handlePointerOver = (e) => {
-    // Cancel any pending hint clear — this prevents flicker when moving between objects
-    if (clearHintTimer.current) {
-      clearTimeout(clearHintTimer.current);
-      clearHintTimer.current = null;
-    }
-
     const obj = e.object;
 
     if (isStrictScreenTarget(obj)) {
@@ -424,7 +418,6 @@ function MainModel({ onEnter }) {
       setHintState(null);
     } else if (obj.userData?.isKey) {
       document.body.style.cursor = 'pointer';
-      // Position hint above the hovered key
       const keyPos = new THREE.Vector3();
       obj.getWorldPosition(keyPos);
       keyPos.y += 0.6;
@@ -433,10 +426,9 @@ function MainModel({ onEnter }) {
       document.body.style.cursor = 'pointer';
       const pos = new THREE.Vector3();
       obj.getWorldPosition(pos);
-      pos.y += 1.2;
+      pos.y += 1.5;
       setHintState({ text: 'give it a spin', position: pos.toArray() });
     } else {
-      // Check if this is a flower or has a flower ancestor
       let isFlower = obj.userData?.isFlower;
       if (!isFlower) {
         let p = obj.parent;
@@ -447,14 +439,13 @@ function MainModel({ onEnter }) {
       }
       if (isFlower) {
         document.body.style.cursor = 'grab';
-        // Find flower group for world position
         let flowerGroup = obj;
         while (flowerGroup.parent && !flowerGroup.parent.userData?.isFlowerGroup && flowerGroup.parent.parent) {
           flowerGroup = flowerGroup.parent;
         }
         const pos = new THREE.Vector3();
         (flowerGroup.userData?.isFlowerGroup ? flowerGroup : obj).getWorldPosition(pos);
-        pos.y += 1.5;
+        pos.y += 2.0;
         setHintState({ text: '✦ it might spin ✦', position: pos.toArray() });
       } else {
         document.body.style.cursor = 'auto';
@@ -465,13 +456,7 @@ function MainModel({ onEnter }) {
 
   const handlePointerOut = () => {
     document.body.style.cursor = 'auto';
-    // Debounce clearing the hint — if pointer enters another object quickly,
-    // the timeout is cancelled and the hint stays
-    if (clearHintTimer.current) clearTimeout(clearHintTimer.current);
-    clearHintTimer.current = setTimeout(() => {
-      setHintState(null);
-      clearHintTimer.current = null;
-    }, 80);
+    setHintState(null);
   };
 
   return (
@@ -988,34 +973,39 @@ export default function ComputerScene({ onEnter, isZoomedIn }) {
     >
       <color attach="background" args={['#111114']} />
 
+      {/* Core scene — loads immediately, no suspense */}
+      <ambientLight intensity={0.9} />
+      <directionalLight
+        position={[10, 15, 10]}
+        intensity={1.8}
+        castShadow
+        shadow-mapSize={[512, 512]}
+        shadow-bias={-0.0001}
+      />
+      <directionalLight position={[-8, 10, -5]} intensity={0.5} color="#88b5ff" />
+      <pointLight position={[0, 5, 0]} intensity={0.4} color="#ffffff" />
+
+      {/* Floor */}
+      <GridFloor />
+
       <Suspense fallback={null}>
-        {/* Lights */}
-        <ambientLight intensity={0.9} />
-        <directionalLight
-          position={[10, 15, 10]}
-          intensity={1.8}
-          castShadow
-          shadow-mapSize={[512, 512]}
-          shadow-bias={-0.0001}
-        />
-        <directionalLight position={[-8, 10, -5]} intensity={0.5} color="#88b5ff" />
-        <pointLight position={[0, 5, 0]} intensity={0.4} color="#ffffff" />
-
-        {/* Floor */}
-        <GridFloor />
-
         {/* GLTF Model + 3D Text on Screen */}
         <MainModel onEnter={onEnter} />
-
-        {/* Floor Labels */}
-        <FloorLabels />
-
-        {/* Laying Cat */}
-        <CatModel />
-        <PorscheModel />
-        {/* Floating Hints */}
-        <HoverHint position={[4.57, 0.5, -0.30]} text="🐱 pet the cat 🐱" />
       </Suspense>
+
+      {/* Floor Labels */}
+      <FloorLabels />
+
+      {/* Extra models — each in their own Suspense so they don't block the scene */}
+      <Suspense fallback={null}>
+        <CatModel />
+      </Suspense>
+      <Suspense fallback={null}>
+        <PorscheModel />
+      </Suspense>
+
+      {/* Floating Hints */}
+      <HoverHint position={[4.57, 0.5, -0.30]} text="🐱 pet the cat 🐱" />
 
       {/* Camera Rig */}
       <CameraRig isZoomedIn={isZoomedIn} />

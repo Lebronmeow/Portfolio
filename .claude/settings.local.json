@@ -3,7 +3,11 @@
     "allow": [
       "Bash(git add *)",
       "Bash(git rm *)",
-      "Bash(git commit -m 'Initial commit: 3D interactive portfolio with Lebron desk scene *)"
+      "Bash(git commit -m 'Initial commit: 3D interactive portfolio with Lebron desk scene *)",
+      "Bash(git push *)",
+      "Bash(gh auth *)",
+      "Bash(npx vite *)",
+      "Bash(git commit -m 'Fix blank screen, CRT flicker, hints positioning *)"
     ]
   }
 }
