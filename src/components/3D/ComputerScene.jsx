@@ -1063,7 +1063,7 @@ function PorscheModel() {
       const velAngle = Math.atan2(vz, vx);
 
       // Drift offset per segment — no blending, instant per segment
-      const driftBySeg = [0, 0, 0.8, 2.5, 1.5, 0.8, 0.3, 0, 0, 0];
+      const driftBySeg = [0, 0, -0.8, -2.5, -1.5, -0.8, -0.3, 0, 0, 0];
       const driftOffset = driftBySeg[Math.min(idx + 1, driftBySeg.length - 1)] || 0;
       const osc = Math.sin(frac * Math.PI * 2) * 0.15;
 
