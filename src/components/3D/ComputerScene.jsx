@@ -934,7 +934,7 @@ function playPorscheMove() {
 }
 
 // ─── Porsche Model with click-to-drift animation ───────────────────────
-function PorscheModel() {
+function PorscheModel({ waypoints }) {
   const groupRef = useRef();
   const { scene } = useGLTF('/models/porsche.glb');
   const busy = useRef(false);
@@ -1030,11 +1030,19 @@ function PorscheModel() {
         },
       });
 
-      // ─── Fixed Drift Path (matches floor reference markers) ───────────
-      const path = DRIFT_PATH_POINTS;
+      // ─── Use user's waypoints or fallback to default path ────────────
+      const path = (waypoints && waypoints.length >= 2) ? waypoints : DRIFT_PATH_POINTS;
 
       // Drift offset per segment: 0=none, 0.5=moderate, 1.0=full drift
-      const driftPerSegment = [0, 0, 0.6, 0.8, 0.5, 0.3, 0.4, 0.5, 0.2, 0];
+      // Generate dynamic array matching path length
+      const driftPerSegment = path.map((_, i) => {
+        if (i === 0 || i === 1) return 0;       // start: straight
+        if (i === 2) return 0.6;                 // initiate drift
+        if (i === 3) return 0.8;                 // hold drift
+        if (i >= 4 && i <= 6) return 0.4;        // mid-drift
+        if (i >= 7) return 0.2;                  // recovering
+        return 0;
+      });
 
       const totalDist = path.reduce((acc, wp, i) => {
         if (i === 0) return 0;
@@ -1165,51 +1173,105 @@ function CameraRig({ isZoomedIn }) {
   );
 }
 
-// ─── Reference Waypoints (numbered markers on the floor) ─────────────
+// ─── Waypoint Marker ──────────────────────────────────────────────────
+function WaypointMarker({ position, number }) {
+  return (
+    <group position={[position[0], 0.05, position[1]]}>
+      <mesh rotation={[-Math.PI / 2, 0, 0]}>
+        <planeGeometry args={[0.8, 0.8]} />
+        <meshBasicMaterial color="#00ff88" transparent opacity={0.3} side={THREE.DoubleSide} />
+      </mesh>
+      <Text
+        position={[0, 0.1, 0]}
+        fontSize={0.35}
+        color="#00ff88"
+        anchorX="center"
+        anchorY="middle"
+        rotation={[-Math.PI / 2, 0, 0]}
+        outlineWidth={0.05}
+        outlineColor="#000"
+        outlineOpacity={0.8}
+        frustumCulled={false}
+      >
+        {String(number)}
+      </Text>
+    </group>
+  );
+}
+
+// ─── Default path (fallback if no waypoints placed) ─────────────────
 const DRIFT_PATH_POINTS = [
-  { x: -4.0, z: -3.5 },  // 1: Start
-  { x: -4.0, z: -2.0 },  // 2: Forward
-  { x: -5.5, z: 0.0 },   // 3: Left
-  { x: -3.0, z: 3.0 },   // 4: Front-left
-  { x: 0.0, z: 4.5 },    // 5: Front-center
-  { x: 3.5, z: 3.5 },    // 6: Front-right
-  { x: 5.0, z: 0.5 },    // 7: Right side
-  { x: 3.0, z: -2.5 },   // 8: Back-right
-  { x: 0.0, z: -4.5 },   // 9: Behind
-  { x: -4.0, z: -3.5 },  // 10: Return
+  { x: -4.0, z: -3.5 },
+  { x: -4.0, z: -2.0 },
+  { x: -5.5, z: 0.0 },
+  { x: -3.0, z: 3.0 },
+  { x: 0.0, z: 4.5 },
+  { x: 3.5, z: 3.5 },
+  { x: 5.0, z: 0.5 },
+  { x: 3.0, z: -2.5 },
+  { x: 0.0, z: -4.5 },
+  { x: -4.0, z: -3.5 },
 ];
 
-function ReferenceMarkers() {
+// ─── Interactive Waypoint Placer ────────────────────────────────────
+function WaypointPlacer({ waypoints, setWaypoints }) {
+  const { raycaster, pointer, camera, scene } = useThree();
+
+  const handleClick = (e) => {
+    e.stopPropagation();
+    raycaster.setFromCamera(pointer, camera);
+    const intersects = raycaster.intersectObjects(scene.children, true);
+    for (const hit of intersects) {
+      const p = hit.point;
+      if (Math.abs(p.y) < 0.5) {
+        setWaypoints(prev => [...prev, { x: Math.round(p.x * 10) / 10, z: Math.round(p.z * 10) / 10 }]);
+        break;
+      }
+    }
+  };
+
+  useEffect(() => {
+    const handleKey = (e) => {
+      if (e.key === 'z' || e.key === 'Z') setWaypoints(prev => prev.slice(0, -1));
+      if (e.key === 'c' || e.key === 'C') setWaypoints([]);
+    };
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  }, [setWaypoints]);
+
   return (
     <group>
-      {DRIFT_PATH_POINTS.map((p, i) => (
-        <group key={i} position={[p.x, 0.05, p.z]}>
-          <mesh rotation={[-Math.PI / 2, 0, 0]}>
-            <planeGeometry args={[0.8, 0.8]} />
-            <meshBasicMaterial color="#00ff88" transparent opacity={0.2} side={THREE.DoubleSide} />
-          </mesh>
-          <Text
-            position={[0, 0.1, 0]}
-            fontSize={0.35}
-            color="#00ff88"
-            anchorX="center"
-            anchorY="middle"
-            rotation={[-Math.PI / 2, 0, 0]}
-            outlineWidth={0.05}
-            outlineColor="#000"
-            outlineOpacity={0.8}
-            frustumCulled={false}
-          >
-            {String(i + 1)}
-          </Text>
-        </group>
+      <mesh
+        position={[0, -0.02, 0]}
+        rotation={[-Math.PI / 2, 0, 0]}
+        onClick={handleClick}
+        onPointerOver={() => { document.body.style.cursor = 'crosshair'; }}
+        onPointerOut={() => { document.body.style.cursor = 'auto'; }}
+      >
+        <planeGeometry args={[40, 40]} />
+        <meshBasicMaterial transparent opacity={0} side={THREE.DoubleSide} />
+      </mesh>
+      {waypoints.map((wp, i) => (
+        <WaypointMarker key={i} position={[wp.x, wp.z]} number={i + 1} />
       ))}
+      <Text
+        position={[0, 4.5, 0]}
+        fontSize={0.3}
+        color="#00ff88"
+        anchorX="center"
+        anchorY="middle"
+        frustumCulled={false}
+      >
+        {`Click floor (${waypoints.length}) — Z undo  |  C clear`}
+      </Text>
     </group>
   );
 }
 
 // ─── Main Export ──────────────────────────────────────────────────────────────
 export default function ComputerScene({ onEnter, isZoomedIn }) {
+  const [waypoints, setWaypoints] = useState([]);
+
   return (
     <Canvas
       shadows
@@ -1242,14 +1304,13 @@ export default function ComputerScene({ onEnter, isZoomedIn }) {
 
       <FloorLabels />
 
-      {/* Reference markers — numbered path points on the floor */}
-      <ReferenceMarkers />
+      <WaypointPlacer waypoints={waypoints} setWaypoints={setWaypoints} />
 
       <Suspense fallback={null}>
         <CatModel />
       </Suspense>
       <Suspense fallback={null}>
-        <PorscheModel />
+        <PorscheModel waypoints={waypoints} />
       </Suspense>
 
       <HoverHint position={[4.57, 0.5, -0.30]} text="🐱 pet the cat 🐱" />
