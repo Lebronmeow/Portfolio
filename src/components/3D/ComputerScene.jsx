@@ -260,17 +260,16 @@ function MainModel({ onEnter, onLoad, onProgress }) {
           if (obj.name) {
             const lower = obj.name.toLowerCase();
 
-            // These are the stickers on the right side of the desk to keep
-            const isRightSideSticker =
-              lower.includes("mid_sticker") ||
-              lower.includes("bottom_sticker.002") ||
-              lower.includes("filler_sticker.005") ||
-              lower.includes("leftmost_sticker.001");
+            // Hide the 3 left CRT stickers by name; keep the right-side ones
+            const isLeftSticker =
+              lower.includes("bottom sticker.003") ||
+              lower.includes("bottom sticker.004") ||
+              lower.includes("bottom sticker.006");
 
             if (
               lower.includes("flippedcard") ||
               lower.includes("polaroid") ||
-              (lower.includes("sticker") && !isRightSideSticker) ||
+              isLeftSticker ||
               lower.includes("marker") ||
               lower.includes("plane") ||
               lower.includes("this_is_me") ||
@@ -301,7 +300,7 @@ function MainModel({ onEnter, onLoad, onProgress }) {
             }
           }
 
-          // Also hide by material to perfectly catch all cards and sticky notes
+          // Also hide by material to perfectly catch all cards, sticky notes, and left stickers
           if (obj.material) {
             const mats = Array.isArray(obj.material)
               ? obj.material
@@ -314,7 +313,10 @@ function MainModel({ onEnter, onLoad, onProgress }) {
                   mLower.includes("motion card") ||
                   mLower.includes("polaroid") ||
                   mLower === "tape" ||
-                  mLower.includes("shadow")
+                  mLower.includes("shadow") ||
+                  mLower === "zeta" ||
+                  mLower === "geeksforgeeks" ||
+                  mLower === "filler sticker"
                 ) {
                   obj.visible = false;
                   obj.scale.set(0, 0, 0);

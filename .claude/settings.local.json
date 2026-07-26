@@ -9,7 +9,8 @@
       "Bash(npx vite *)",
       "Bash(git commit -m 'Fix blank screen, CRT flicker, hints positioning *)",
       "Bash(git commit *)",
-      "WebSearch"
+      "WebSearch",
+      "Bash(node -e ' *)"
     ]
   }
 }

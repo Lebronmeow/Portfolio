@@ -815,7 +815,10 @@ function WorkContent() {
 const WALLPAPER_STYLE = {
   position: 'absolute',
   inset: 0,
-  background: 'linear-gradient(135deg, #0d0d1a 0%, #1a1a3e 20%, #2d1b4e 40%, #1a2a4a 60%, #0d1a2d 80%, #0d0d1a 100%)',
+  backgroundImage: 'url(/wallpaper.png)',
+  backgroundSize: 'cover',
+  backgroundPosition: 'center',
+  backgroundRepeat: 'no-repeat',
   overflow: 'hidden',
 };
 
