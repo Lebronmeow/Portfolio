@@ -241,7 +241,13 @@ function MainModel({ onEnter }) {
               lower.includes('raptor') ||
               lower.includes('lottiemon') ||
               lower.includes('car') ||
-              lower.includes('vehicle')
+              lower.includes('vehicle') ||
+              lower.includes('ae86') ||
+              lower.includes('86') ||
+              lower.includes('toyota') ||
+              lower.includes('hatchback') ||
+              lower.includes('sprinter') ||
+              lower.includes('corolla')
             ) {
               obj.visible = false;
               obj.scale.set(0, 0, 0);
@@ -261,7 +267,6 @@ function MainModel({ onEnter }) {
                   mLower.includes('polaroid') ||
                   mLower === 'tape' ||
                   mLower.includes('shadow')
-                ) {
                   obj.visible = false;
                   obj.scale.set(0, 0, 0);
                   obj.position.set(0, -100, 0);
@@ -928,9 +933,9 @@ function PorscheModel() {
   return (
     <group
       ref={groupRef}
-      position={[-8.0, 0.05, 6.0]}
-      rotation={[0, 0.8, 0]}
-      scale={[1.5, 1.5, 1.5]}
+      position={[1.5, 0.1, 3.0]}
+      rotation={[0, -1.2, 0]}
+      scale={[3.0, 3.0, 3.0]}
     >
       <primitive object={scene} />
     </group>
