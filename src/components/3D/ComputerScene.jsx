@@ -1053,12 +1053,12 @@ function PorscheModel() {
       };
 
       // Physics constants
-      const MAX_SPEED = 7.0;
-      const ACCEL = 3.0;
-      const DECEL = 0.988;
+      const MAX_SPEED = 10.0;
+      const ACCEL = 5.0;
+      const DECEL = 0.997;
       const STEER_DAMP = 0.08;    // steering smoothing
       const YAW_INERTIA = 0.90;   // how much yaw persists
-      const YAW_RESPONSE = 5.0;   // steering → yaw torque
+      const YAW_RESPONSE = 8.0;   // steering → yaw torque
       const YAW_DAMP = 0.94;      // yaw friction
       const GRIP_DRIFT = 0.25;    // rear grip during full drift
       const GRIP_RECOVER = 0.015; // grip recovery rate
@@ -1090,20 +1090,22 @@ function PorscheModel() {
 
           // 3. Direction to target waypoint
           const targetAngle = Math.atan2(wp.z - sim.z, wp.x - sim.x);
-          const angleToTarget = ((targetAngle - (sim.heading - Math.PI / 2)) + Math.PI * 3) % (Math.PI * 2) - Math.PI;
+          // Car's actual forward direction angle: (-sin(heading), -cos(heading))
+          const facingAngle = Math.atan2(-Math.cos(sim.heading), -Math.sin(sim.heading));
+          let angleToTarget = ((targetAngle - facingAngle) + Math.PI * 3) % (Math.PI * 2) - Math.PI;
 
           // 4. Phase-based steering and throttle
           let desiredSteer = 0;
           if (sim.phase === 0) {
             // Normal drive: gentle steer, full grip
             desiredSteer = Math.max(-0.5, Math.min(0.5, angleToTarget * 0.5));
-            sim.throttle = 0.7;
+            sim.throttle = 1.0;
             sim.rearGrip = 1.0;
           } else if (sim.phase === 1) {
             // Initiate: sharp steering flick + throttle spike
             sim.initTimer += dt;
             const flick = Math.max(0, 1 - sim.initTimer / 0.6);
-            desiredSteer = 0.9 * flick;
+            desiredSteer = 1.2 * flick;
             sim.throttle = 0.8 + flick * 0.4;
             sim.rearGrip = Math.max(GRIP_DRIFT, 1.0 - sim.initTimer * 1.5);
             if (sim.initTimer > 0.8) sim.phase = 2;
@@ -1111,8 +1113,8 @@ function PorscheModel() {
             // Hold drift: countersteer based on slip angle
             const velAngle = Math.atan2(sim.vz, sim.vx);
             let slipAngle = ((sim.heading - Math.PI / 2) - velAngle + Math.PI * 3) % (Math.PI * 2) - Math.PI;
-            desiredSteer = -slipAngle * 0.25;
-            sim.throttle = 0.6;
+            desiredSteer = -slipAngle * 0.4;
+            sim.throttle = 0.8;
             sim.rearGrip = Math.max(GRIP_DRIFT, sim.rearGrip - 0.005);
           } else if (sim.phase === 3) {
             // Recovery: gradually restore grip, reduce steering
@@ -1156,7 +1158,7 @@ function PorscheModel() {
 
           // Lateral slip from rear grip loss
           const slipFactor = Math.max(0, 1 - sim.rearGrip * 1.2);
-          const lateralSlip = sim.steerAngle * slipFactor * 0.6;
+          const lateralSlip = sim.steerAngle * slipFactor * 0.8;
 
           // Velocity = forward + lateral
           sim.vx = fwdX * fwdVel + latX * lateralSlip * fwdVel;
