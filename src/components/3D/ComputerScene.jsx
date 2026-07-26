@@ -82,22 +82,28 @@ function MainModel({ onEnter }) {
   const pressingKeys = useRef(new Set());
   const clearHintTimer = useRef(null);
 
-  // CRT Flicker Animation — dramatic CRT scanline flicker
+  // CRT Flicker Animation — subtle CRT pulse
+  const flickerTick = useRef(0);
   useFrame((state) => {
     const t = state.clock.elapsedTime;
-    // Fast sine oscillation + random voltage spikes (every frame)
-    const pulse = Math.sin(t * 36) * 0.35 + 0.65;
-    const micro = (Math.random() - 0.5) * 0.25;
-    const brightness = Math.max(0.05, Math.min(1.0, pulse + micro));
+    // Update every ~30ms for subtle visible flicker
+    flickerTick.current += state.clock.getDelta();
+    if (flickerTick.current < 0.03) return;
+    flickerTick.current = 0;
 
-    // Flicker the screen background — wide visible range
+    // Gentle sine pulse + rare voltage flicker
+    const pulse = Math.sin(t * 12) * 0.15 + 0.85;
+    const micro = Math.random() < 0.08 ? (Math.random() - 0.5) * 0.15 : 0;
+    const brightness = Math.max(0.2, Math.min(1.0, pulse + micro));
+
+    // Flicker the screen background
     if (screenMatRef.current) {
-      const val = brightness * 0.5;
-      screenMatRef.current.color.setRGB(val, val, val * 1.2);
+      const val = brightness * 0.35;
+      screenMatRef.current.color.setRGB(val, val, val * 1.15);
     }
-    // Flicker the text opacity — dramatic on/off feel
+    // Flicker the text opacity
     if (textRef.current) {
-      textRef.current.fillOpacity = Math.max(0.15, brightness);
+      textRef.current.fillOpacity = Math.max(0.3, brightness);
     }
   });
 
@@ -405,12 +411,8 @@ function MainModel({ onEnter }) {
     }
   };
 
-  const lastHoveredRef = useRef(null);
-
-  const handlePointerMove = (e) => {
+  const handlePointerOver = (e) => {
     const obj = e.object;
-    if (obj === lastHoveredRef.current) return;
-    lastHoveredRef.current = obj;
 
     if (isStrictScreenTarget(obj)) {
       document.body.style.cursor = 'pointer';
@@ -455,18 +457,17 @@ function MainModel({ onEnter }) {
 
   const handlePointerOut = () => {
     document.body.style.cursor = 'auto';
-    lastHoveredRef.current = null;
     setHintState(null);
   };
 
   return (
     <>
-      <group onPointerMove={handlePointerMove} onPointerOut={handlePointerOut}>
-        <primitive
-          object={model}
-          onClick={handleClick}
-        />
-      </group>
+      <primitive
+        object={model}
+        onClick={handleClick}
+        onPointerOver={handlePointerOver}
+        onPointerOut={handlePointerOut}
+      />
 
       {/* ── 3D Text Overlay positioned directly on screen face ── */}
       {screenData && (
