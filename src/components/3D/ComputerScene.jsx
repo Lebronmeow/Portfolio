@@ -1048,7 +1048,7 @@ function PorscheModel({ waypoints }) {
       const driftAngles = path.map((wp, i) => {
         if (i === 0) return 0;
         if (i === 1) return 0.2;     // forward: slight drift
-        if (i === 2) return -0.3;    // 2→3: slight right turn
+        if (i === 2) return 0.3;     // forward→2: slight left turn
         if (i === 3) return 0.6;     // 3→4: drift
         if (i === 4) return -0.2;    // 4→5: subtle left
         if (i === 5) return 0.3;     // 5→6: slight right
