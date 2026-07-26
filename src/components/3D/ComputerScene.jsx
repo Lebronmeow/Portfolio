@@ -1031,8 +1031,8 @@ function PorscheModel() {
       });
 
       // ─── Physics-Based Drift Controller (bicycle model) ────────────────
-      // Build path: start position → waypoints → return to start
-      const path = [{ x: orig.x, z: orig.z }, ...DRIFT_PATH_POINTS, { x: orig.x, z: orig.z }];
+      // Build path: waypoints → return to start (car starts at orig, first target is waypoint 1)
+      const path = [...DRIFT_PATH_POINTS, { x: orig.x, z: orig.z }];
 
       // Physics state — all independent
       const sim = {
@@ -1056,10 +1056,10 @@ function PorscheModel() {
       const MAX_SPEED = 7.0;
       const ACCEL = 3.0;
       const DECEL = 0.988;
-      const STEER_DAMP = 0.06;    // steering smoothing
-      const YAW_INERTIA = 0.92;   // how much yaw persists
-      const YAW_RESPONSE = 3.5;   // steering → yaw torque
-      const YAW_DAMP = 0.96;      // yaw friction
+      const STEER_DAMP = 0.08;    // steering smoothing
+      const YAW_INERTIA = 0.90;   // how much yaw persists
+      const YAW_RESPONSE = 5.0;   // steering → yaw torque
+      const YAW_DAMP = 0.94;      // yaw friction
       const GRIP_DRIFT = 0.25;    // rear grip during full drift
       const GRIP_RECOVER = 0.015; // grip recovery rate
 
@@ -1080,7 +1080,7 @@ function PorscheModel() {
           sim.distToTarget = Math.sqrt(dx * dx + dz * dz);
 
           // 2. Advance waypoint when close
-          if (sim.distToTarget < 1.5 && sim.targetIdx < path.length - 1) {
+          if (sim.distToTarget < 2.5 && sim.targetIdx < path.length - 1) {
             sim.targetIdx++;
             if (sim.targetIdx === 2) { sim.phase = 1; sim.initTimer = 0; }
             if (sim.targetIdx === 3) sim.phase = 2;
@@ -1096,8 +1096,8 @@ function PorscheModel() {
           let desiredSteer = 0;
           if (sim.phase === 0) {
             // Normal drive: gentle steer, full grip
-            desiredSteer = Math.max(-0.3, Math.min(0.3, angleToTarget * 0.3));
-            sim.throttle = 0.6;
+            desiredSteer = Math.max(-0.5, Math.min(0.5, angleToTarget * 0.5));
+            sim.throttle = 0.7;
             sim.rearGrip = 1.0;
           } else if (sim.phase === 1) {
             // Initiate: sharp steering flick + throttle spike
@@ -1123,8 +1123,8 @@ function PorscheModel() {
             sim.rearGrip = Math.min(1.0, sim.rearGrip + GRIP_RECOVER * 2);
           } else {
             // Return to start: normal driving
-            desiredSteer = Math.max(-0.3, Math.min(0.3, angleToTarget * 0.25));
-            sim.throttle = 0.4;
+            desiredSteer = Math.max(-0.5, Math.min(0.5, angleToTarget * 0.4));
+            sim.throttle = 0.5;
             sim.rearGrip = Math.min(1.0, sim.rearGrip + GRIP_RECOVER * 3);
           }
 
