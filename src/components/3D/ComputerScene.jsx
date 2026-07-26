@@ -1031,8 +1031,8 @@ function PorscheModel() {
       });
 
       // Physics-based drift using slip angle calculation
-      const CIRCLE_CENTER = { x: 0.5, z: -0.5 };
-      const RADIUS = 5.0;
+      const CIRCLE_CENTER = { x: -1.0, z: -1.0 };
+      const RADIUS = 4.0;
       const startAngle = Math.atan2(orig.z - CIRCLE_CENTER.z, orig.x - CIRCLE_CENTER.x);
       const K = 2.5; // Drift tuning constant (higher = easier to drift)
       const driftState = { angle: startAngle, prevX: orig.x, prevZ: orig.z };
