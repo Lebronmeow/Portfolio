@@ -934,7 +934,7 @@ function playPorscheMove() {
 }
 
 // ─── Porsche Model with click-to-drift animation ───────────────────────
-function PorscheModel({ waypoints }) {
+function PorscheModel() {
   const groupRef = useRef();
   const { scene } = useGLTF('/models/porsche.glb');
   const busy = useRef(false);
@@ -1031,7 +1031,7 @@ function PorscheModel({ waypoints }) {
       });
 
       // ─── Physics-Based Drift Controller ────────────────────────────────
-      const path = (waypoints && waypoints.length >= 2) ? waypoints : DRIFT_PATH_POINTS;
+      const path = DRIFT_PATH_POINTS;
 
       // Physics state — everything is independent
       const sim = {
@@ -1286,18 +1286,18 @@ function WaypointMarker({ position, number }) {
   );
 }
 
-// ─── Default path (fallback if no waypoints placed) ─────────────────
+// ─── Final Drift Path (hardcoded from user's waypoints) ────────────
 const DRIFT_PATH_POINTS = [
-  { x: -4.0, z: -3.5 },
-  { x: -4.0, z: -2.0 },
-  { x: -5.5, z: 0.0 },
-  { x: -3.0, z: 3.0 },
-  { x: 0.0, z: 4.5 },
-  { x: 3.5, z: 3.5 },
-  { x: 5.0, z: 0.5 },
-  { x: 3.0, z: -2.5 },
-  { x: 0.0, z: -4.5 },
-  { x: -4.0, z: -3.5 },
+  { x: -4.8, z: -3.0 },   // 1
+  { x: -5.0, z: 2.0 },    // 2
+  { x: -2.9, z: 8.0 },    // 3
+  { x: 2.1, z: 11.0 },    // 4
+  { x: 7.4, z: 9.0 },     // 5
+  { x: 12.7, z: 2.0 },    // 6
+  { x: 11.7, z: -7.0 },   // 7
+  { x: 5.7, z: -12.0 },   // 8
+  { x: -1.3, z: -11.0 },  // 9
+  { x: -5.2, z: -11.0 },  // 10
 ];
 
 // ─── Interactive Waypoint Placer ────────────────────────────────────
@@ -1369,10 +1369,56 @@ function WaypointPlacer({ waypoints, setWaypoints }) {
   );
 }
 
+// ─── Reference Markers (show final path on floor) ───────────────────
+function ReferenceMarkers() {
+  return (
+    <group>
+      {DRIFT_PATH_POINTS.map((p, i) => (
+        <group key={i} position={[p.x, 0.05, p.z]}>
+          <mesh rotation={[-Math.PI / 2, 0, 0]}>
+            <planeGeometry args={[0.7, 0.7]} />
+            <meshBasicMaterial color="#00ff88" transparent opacity={0.25} side={THREE.DoubleSide} />
+          </mesh>
+          <Text
+            position={[0, 0.1, 0]}
+            fontSize={0.3}
+            color="#00ff88"
+            anchorX="center"
+            anchorY="middle"
+            rotation={[-Math.PI / 2, 0, 0]}
+            outlineWidth={0.04}
+            outlineColor="#000"
+            outlineOpacity={0.8}
+            frustumCulled={false}
+          >
+            {String(i + 1)}
+          </Text>
+        </group>
+      ))}
+      {/* Car start marker */}
+      <group position={[-4.0, 0.05, -3.5]}>
+        <mesh rotation={[-Math.PI / 2, 0, 0]}>
+          <planeGeometry args={[0.5, 0.5]} />
+          <meshBasicMaterial color="#ff8844" transparent opacity={0.4} side={THREE.DoubleSide} />
+        </mesh>
+        <Text
+          position={[0, 0.1, 0]}
+          fontSize={0.25}
+          color="#ff8844"
+          anchorX="center"
+          anchorY="middle"
+          rotation={[-Math.PI / 2, 0, 0]}
+          frustumCulled={false}
+        >
+          START
+        </Text>
+      </group>
+    </group>
+  );
+}
+
 // ─── Main Export ──────────────────────────────────────────────────────────────
 export default function ComputerScene({ onEnter, isZoomedIn }) {
-  const [waypoints, setWaypoints] = useState([]);
-
   return (
     <Canvas
       shadows
@@ -1405,13 +1451,13 @@ export default function ComputerScene({ onEnter, isZoomedIn }) {
 
       <FloorLabels />
 
-      <WaypointPlacer waypoints={waypoints} setWaypoints={setWaypoints} />
+      <ReferenceMarkers />
 
       <Suspense fallback={null}>
         <CatModel />
       </Suspense>
       <Suspense fallback={null}>
-        <PorscheModel waypoints={waypoints} />
+        <PorscheModel />
       </Suspense>
 
       <HoverHint position={[4.57, 0.5, -0.30]} text="🐱 pet the cat 🐱" />
