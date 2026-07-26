@@ -1006,8 +1006,7 @@ function PorscheModel() {
       // Phase 2: 360 circle behind the CRT
       // Phase 3: Return to start and park
 
-      // ─── Physics-Based Drift Controller ────────────────────────────────
-      const sim = {
+      simRef.current = {
         x: orig.x, z: orig.z,
         heading: 2.5,
         yawVelocity: 0,
@@ -1022,19 +1021,8 @@ function PorscheModel() {
         initTimer: 0,
         driftTimer: 0,
       };
-
-      const MAX_SPEED = 10.0;
-      const ACCEL = 5.0;
       const DECEL = 0.997;
-      const STEER_DAMP = 0.12;
-      const YAW_RESPONSE = 15.0;
-      const GRIP_DRIFT = 0.25;
-
-      const wp2 = DRIFT_PATH_POINTS[1];
-      const wp4 = DRIFT_PATH_POINTS[3];
-      let lastTime = 0;
-
-      // Physics runs via useFrame — just play sounds
+      // Physics runs via useFrame — just play the move sound
       playPorscheMove();
     }, 1500);
   };
