@@ -1030,13 +1030,12 @@ function PorscheModel() {
         },
       });
 
-      // Smooth circular drift — car always faces direction of travel
+      // Physics-based drift using slip angle calculation
       const CIRCLE_CENTER = { x: 0.5, z: -0.5 };
       const RADIUS = 5.0;
-      // Starting angle on the circle (matches car's actual position)
       const startAngle = Math.atan2(orig.z - CIRCLE_CENTER.z, orig.x - CIRCLE_CENTER.x);
-      // Car faces tangent to circle = forward direction
-      const driftState = { angle: startAngle };
+      const K = 2.5; // Drift tuning constant (higher = easier to drift)
+      const driftState = { angle: startAngle, prevX: orig.x, prevZ: orig.z };
 
       tl.to(driftState, {
         angle: startAngle + Math.PI * 2,
@@ -1044,12 +1043,45 @@ function PorscheModel() {
         ease: 'none',
         onUpdate: () => {
           const a = driftState.angle;
-          // Position on circle
-          target.position.x = CIRCLE_CENTER.x + Math.cos(a) * RADIUS;
-          target.position.z = CIRCLE_CENTER.z + Math.sin(a) * RADIUS;
-          // Car always faces the direction of travel (tangent to circle)
-          // + tiny drift angle so rear slightly slides out
-          target.rotation.y = a + Math.PI / 2 + 0.25;
+
+          // Position on circle (this is the path the car follows)
+          const newX = CIRCLE_CENTER.x + Math.cos(a) * RADIUS;
+          const newZ = CIRCLE_CENTER.z + Math.sin(a) * RADIUS;
+
+          // 1. Velocity vector = actual movement direction
+          const vx = newX - driftState.prevX;
+          const vz = newZ - driftState.prevZ;
+          const vLen = Math.sqrt(vx * vx + vz * vz);
+
+          if (vLen > 0.001) {
+            // Normalized velocity direction
+            const vnx = vx / vLen;
+            const vnz = vz / vLen;
+
+            // 2. Forward vector = where the car points (tangent to circle)
+            const tangent = a + Math.PI / 2;
+            const fx = Math.cos(tangent);
+            const fz = Math.sin(tangent);
+
+            // 3. Slip angle = angle between forward and velocity
+            const dot = fx * vnx + fz * vnz;
+            const slipAngle = Math.acos(Math.max(-1, Math.min(1, dot)));
+
+            // 4. Grip modifier — as slip angle grows, grip drops
+            const G = 1 / (1 + Math.pow(K * slipAngle, 2));
+
+            // 5. The car's heading = velocity direction + slip angle * grip
+            // Low grip = more slip = rear swings out more
+            const velocityAngle = Math.atan2(vnz, vnx);
+            const driftOffset = slipAngle * (1 - G) * 0.5;
+            target.rotation.y = velocityAngle + Math.PI / 2 + driftOffset;
+          }
+
+          // Update position
+          target.position.x = newX;
+          target.position.z = newZ;
+          driftState.prevX = newX;
+          driftState.prevZ = newZ;
         },
       }, 0.5);
     }, ENGINE_START_DELAY);
