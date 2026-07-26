@@ -82,27 +82,22 @@ function MainModel({ onEnter }) {
   const pressingKeys = useRef(new Set());
   const clearHintTimer = useRef(null);
 
-  // CRT Flicker Animation — visible CRT scanline flicker
-  const flickerTick = useRef(0);
+  // CRT Flicker Animation — dramatic CRT scanline flicker
   useFrame((state) => {
     const t = state.clock.elapsedTime;
-    // Update every ~16ms for strong visible flicker
-    flickerTick.current += state.clock.getDelta();
-    if (flickerTick.current < 0.016) return;
-    flickerTick.current = 0;
+    // Fast sine oscillation + random voltage spikes (every frame)
+    const pulse = Math.sin(t * 36) * 0.35 + 0.65;
+    const micro = (Math.random() - 0.5) * 0.25;
+    const brightness = Math.max(0.05, Math.min(1.0, pulse + micro));
 
-    // Strong CRT flicker: sine pulse + random voltage spikes
-    const pulse = Math.sin(t * 24) * 0.3 + 0.7;
-    const micro = (Math.random() - 0.5) * 0.2;
-    const brightness = Math.max(0.15, Math.min(1.0, pulse + micro));
-
-    // Flicker the screen background — visible range from dark to bright
+    // Flicker the screen background — wide visible range
     if (screenMatRef.current) {
-      screenMatRef.current.color.setScalar(brightness * 0.35);
+      const val = brightness * 0.5;
+      screenMatRef.current.color.setRGB(val, val, val * 1.2);
     }
-    // Flicker the text opacity
+    // Flicker the text opacity — dramatic on/off feel
     if (textRef.current) {
-      textRef.current.fillOpacity = Math.max(0.2, brightness);
+      textRef.current.fillOpacity = Math.max(0.15, brightness);
     }
   });
 
@@ -410,8 +405,12 @@ function MainModel({ onEnter }) {
     }
   };
 
-  const handlePointerOver = (e) => {
+  const lastHoveredRef = useRef(null);
+
+  const handlePointerMove = (e) => {
     const obj = e.object;
+    if (obj === lastHoveredRef.current) return;
+    lastHoveredRef.current = obj;
 
     if (isStrictScreenTarget(obj)) {
       document.body.style.cursor = 'pointer';
@@ -445,7 +444,7 @@ function MainModel({ onEnter }) {
         }
         const pos = new THREE.Vector3();
         (flowerGroup.userData?.isFlowerGroup ? flowerGroup : obj).getWorldPosition(pos);
-        pos.y += 2.0;
+        pos.y += 2.5;
         setHintState({ text: '✦ it might spin ✦', position: pos.toArray() });
       } else {
         document.body.style.cursor = 'auto';
@@ -456,17 +455,18 @@ function MainModel({ onEnter }) {
 
   const handlePointerOut = () => {
     document.body.style.cursor = 'auto';
+    lastHoveredRef.current = null;
     setHintState(null);
   };
 
   return (
     <>
-      <primitive
-        object={model}
-        onClick={handleClick}
-        onPointerOver={handlePointerOver}
-        onPointerOut={handlePointerOut}
-      />
+      <group onPointerMove={handlePointerMove} onPointerOut={handlePointerOut}>
+        <primitive
+          object={model}
+          onClick={handleClick}
+        />
+      </group>
 
       {/* ── 3D Text Overlay positioned directly on screen face ── */}
       {screenData && (
@@ -575,17 +575,24 @@ function FloorLabel({ children, fontSize, color, position, letterSpacing, riseAm
     if (!onClick) document.body.style.cursor = 'auto';
   };
 
+  // Approximate text width based on chars, font size, and letter spacing
+  const textStr = typeof children === 'string' ? children : '';
+  const approxTextWidth = textStr.length * fontSize * (0.5 + (letterSpacing || 0));
+  const hitboxW = Math.max(approxTextWidth * 1.3, 1.2);
+  const hitboxD = Math.max(fontSize * 1.3, 0.5);
+  const hitboxX = approxTextWidth * 0.5;
+
   return (
     <group ref={groupRef} position={position} rotation={[0, 0, 0]}>
-      {/* Large invisible hitbox centered on the text */}
+      {/* Invisible hitbox sized to match text */}
       <mesh
-        position={[1.2, 0, 0]}
+        position={[hitboxX, 0, 0]}
         onPointerOver={handleOver}
         onPointerOut={handleOut}
         onClick={(e) => { e.stopPropagation(); onClick?.(); }}
         renderOrder={0}
       >
-        <boxGeometry args={[4.0, 0.02, 1.0]} />
+        <boxGeometry args={[hitboxW, 0.02, hitboxD]} />
         <meshBasicMaterial transparent opacity={0} depthWrite={false} depthTest={false} />
       </mesh>
       {/* Visual 3D text lying flat on the floor */}
