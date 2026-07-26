@@ -1032,42 +1032,52 @@ function PorscheModel() {
         },
       });
 
-      // Smooth drift path with keyframes around the desk
-      // The car starts at [-4, 0, -3.5] facing toward desk
-      // Path: left in front of keyboard → right side of CRT → behind → return
-
-      // Define keyframes: [x, z, rotation_y]
-      const keyframes = [
-        { x: -4.0, z: -3.5, rot: 2.5, t: 0 },      // Start
-        { x: -5.0, z: -1.0, rot: 1.0, t: 0.7 },     // Left in front of keyboard
-        { x: -3.0, z: 2.0, rot: 0.2, t: 1.4 },      // Front of keyboard, turning
-        { x: 0.0, z: 3.5, rot: 3.0, t: 2.0 },       // Rear faces camera
-        { x: 3.0, z: 2.5, rot: 1.8, t: 2.8 },       // Right side of CRT, sideways
-        { x: 4.5, z: 0.0, rot: 1.2, t: 3.5 },       // Further right
-        { x: 3.0, z: -2.5, rot: 0.0, t: 4.3 },      // Behind CRT, facing front
-        { x: 0.0, z: -4.0, rot: 5.8, t: 5.0 },      // Continue behind
-        { x: -2.5, z: -4.0, rot: 5.0, t: 5.7 },     // Coming back
-        { x: orig.x, z: orig.z, rot: origRot, t: 6.5 }, // Park at start
+      // Smooth continuous drift path — single animation with interpolation
+      // This avoids pauses between keyframes
+      const pathPoints = [
+        { x: -4.0, z: -3.5, rot: 2.5 },   // Start
+        { x: -6.0, z: -1.0, rot: 1.0 },   // Wider left in front of keyboard
+        { x: -4.0, z: 3.0, rot: 0.0 },    // Front of keyboard
+        { x: 0.0, z: 4.5, rot: 3.0 },     // Rear faces camera
+        { x: 4.0, z: 3.5, rot: 1.8 },     // Right side of CRT, sideways
+        { x: 5.5, z: 0.0, rot: 1.0 },     // Further right
+        { x: 4.0, z: -3.0, rot: 0.0 },    // Behind CRT, facing front
+        { x: 0.0, z: -5.0, rot: 5.8 },    // Wide behind
+        { x: -3.0, z: -5.0, rot: 5.0 },   // Coming back
+        { x: orig.x, z: orig.z, rot: origRot }, // Park at start
       ];
 
-      // Animate through each keyframe
-      for (let i = 1; i < keyframes.length; i++) {
-        const prev = keyframes[i - 1];
-        const kf = keyframes[i];
-        const dur = kf.t - prev.t;
+      const pathDuration = 6.5;
+      const pathState = { progress: 0 };
 
-        tl.to(target.position, {
-          x: kf.x,
-          z: kf.z,
-          duration: dur,
-          ease: 'power2.inOut',
-        }, prev.t)
-        .to(target.rotation, {
-          y: kf.rot,
-          duration: dur,
-          ease: 'power2.inOut',
-        }, prev.t);
-      }
+      tl.to(pathState, {
+        progress: 1,
+        duration: pathDuration,
+        ease: 'none',
+        onUpdate: () => {
+          const p = pathState.progress;
+          // Calculate which segment we're in
+          const segCount = pathPoints.length - 1;
+          const rawIdx = p * segCount;
+          const idx = Math.min(Math.floor(rawIdx), segCount - 1);
+          const frac = rawIdx - idx;
+
+          // Smooth step for each segment (ease in/out within segment)
+          const smoothFrac = frac * frac * (3 - 2 * frac); // smoothstep
+
+          const from = pathPoints[idx];
+          const to = pathPoints[idx + 1];
+
+          target.position.x = from.x + (to.x - from.x) * smoothFrac;
+          target.position.z = from.z + (to.z - from.z) * smoothFrac;
+
+          // Interpolate rotation with shortest path
+          let rotDiff = to.rot - from.rot;
+          if (rotDiff > Math.PI) rotDiff -= Math.PI * 2;
+          if (rotDiff < -Math.PI) rotDiff += Math.PI * 2;
+          target.rotation.y = from.rot + rotDiff * smoothFrac;
+        },
+      }, 0.5);
     }, ENGINE_START_DELAY);
   };
 
