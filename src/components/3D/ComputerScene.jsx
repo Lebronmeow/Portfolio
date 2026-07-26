@@ -73,37 +73,101 @@ function isKeyboardKey(obj) {
 
 // ─── Main 3D Model with Dynamic Screen Text Overlay ──────────────────────────
 function MainModel({ onEnter }) {
-  const { gl } = useThree();
+  const { gl, raycaster, pointer, camera } = useThree();
   const [model, setModel] = useState(null);
   const [screenData, setScreenData] = useState(null);
   const [hintState, setHintState] = useState(null); // { text, position }
   const textRef = useRef();
   const screenMatRef = useRef();
   const pressingKeys = useRef(new Set());
-  const clearHintTimer = useRef(null);
+  const lastHovered = useRef(null);
+  const rayTick = useRef(0);
 
-  // CRT Flicker Animation — subtle CRT pulse
+  // CRT Flicker Animation — visible CRT pulse
   const flickerTick = useRef(0);
   useFrame((state) => {
     const t = state.clock.elapsedTime;
-    // Update every ~30ms for subtle visible flicker
+    // Update every ~20ms for visible flicker
     flickerTick.current += state.clock.getDelta();
-    if (flickerTick.current < 0.03) return;
+    if (flickerTick.current < 0.02) return;
     flickerTick.current = 0;
 
-    // Gentle sine pulse + rare voltage flicker
-    const pulse = Math.sin(t * 12) * 0.15 + 0.85;
-    const micro = Math.random() < 0.08 ? (Math.random() - 0.5) * 0.15 : 0;
-    const brightness = Math.max(0.2, Math.min(1.0, pulse + micro));
+    // Sine pulse + random voltage spikes
+    const pulse = Math.sin(t * 18) * 0.22 + 0.78;
+    const micro = Math.random() < 0.12 ? (Math.random() - 0.5) * 0.18 : 0;
+    const brightness = Math.max(0.15, Math.min(1.0, pulse + micro));
 
     // Flicker the screen background
     if (screenMatRef.current) {
-      const val = brightness * 0.35;
-      screenMatRef.current.color.setRGB(val, val, val * 1.15);
+      const val = brightness * 0.4;
+      screenMatRef.current.color.setRGB(val, val, val * 1.2);
     }
     // Flicker the text opacity
     if (textRef.current) {
-      textRef.current.fillOpacity = Math.max(0.3, brightness);
+      textRef.current.fillOpacity = Math.max(0.2, brightness);
+    }
+  });
+
+  // ─── Hover Detection via Raycasting ───────────────────────────────────
+  // Uses manual raycasting every ~100ms instead of relying on onPointerOver
+  // (which only fires once on the primitive root)
+  useFrame((state) => {
+    if (!model) return;
+    rayTick.current += state.clock.getDelta();
+    if (rayTick.current < 0.1) return;
+    rayTick.current = 0;
+
+    raycaster.setFromCamera(pointer, camera);
+    const intersects = raycaster.intersectObjects(model.children, true);
+
+    if (intersects.length > 0) {
+      const obj = intersects[0].object;
+      if (obj === lastHovered.current) return;
+      lastHovered.current = obj;
+
+      if (isStrictScreenTarget(obj)) {
+        document.body.style.cursor = 'pointer';
+        setHintState(null);
+      } else if (obj.userData?.isKey) {
+        document.body.style.cursor = 'pointer';
+        const keyPos = new THREE.Vector3();
+        obj.getWorldPosition(keyPos);
+        keyPos.y += 0.6;
+        setHintState({ text: '⌨️ try clicking keys ⌨️', position: keyPos.toArray() });
+      } else if (obj.userData?.isVase) {
+        document.body.style.cursor = 'pointer';
+        const pos = new THREE.Vector3();
+        obj.getWorldPosition(pos);
+        pos.y += 2.0;
+        setHintState({ text: 'give it a spin', position: pos.toArray() });
+      } else {
+        let isFlower = obj.userData?.isFlower;
+        if (!isFlower) {
+          let p = obj.parent;
+          while (p) {
+            if (p.userData?.isFlowerGroup) { isFlower = true; break; }
+            p = p.parent;
+          }
+        }
+        if (isFlower) {
+          document.body.style.cursor = 'grab';
+          let flowerGroup = obj;
+          while (flowerGroup.parent && !flowerGroup.parent.userData?.isFlowerGroup && flowerGroup.parent.parent) {
+            flowerGroup = flowerGroup.parent;
+          }
+          const pos = new THREE.Vector3();
+          (flowerGroup.userData?.isFlowerGroup ? flowerGroup : obj).getWorldPosition(pos);
+          pos.y += 3.0;
+          setHintState({ text: '✦ it might spin ✦', position: pos.toArray() });
+        } else {
+          document.body.style.cursor = 'auto';
+          setHintState(null);
+        }
+      }
+    } else if (lastHovered.current !== null) {
+      lastHovered.current = null;
+      document.body.style.cursor = 'auto';
+      setHintState(null);
     }
   });
 
@@ -411,62 +475,11 @@ function MainModel({ onEnter }) {
     }
   };
 
-  const handlePointerOver = (e) => {
-    const obj = e.object;
-
-    if (isStrictScreenTarget(obj)) {
-      document.body.style.cursor = 'pointer';
-      setHintState(null);
-    } else if (obj.userData?.isKey) {
-      document.body.style.cursor = 'pointer';
-      const keyPos = new THREE.Vector3();
-      obj.getWorldPosition(keyPos);
-      keyPos.y += 0.6;
-      setHintState({ text: '⌨️ try clicking keys ⌨️', position: keyPos.toArray() });
-    } else if (obj.userData?.isVase) {
-      document.body.style.cursor = 'pointer';
-      const pos = new THREE.Vector3();
-      obj.getWorldPosition(pos);
-      pos.y += 1.5;
-      setHintState({ text: 'give it a spin', position: pos.toArray() });
-    } else {
-      let isFlower = obj.userData?.isFlower;
-      if (!isFlower) {
-        let p = obj.parent;
-        while (p) {
-          if (p.userData?.isFlowerGroup) { isFlower = true; break; }
-          p = p.parent;
-        }
-      }
-      if (isFlower) {
-        document.body.style.cursor = 'grab';
-        let flowerGroup = obj;
-        while (flowerGroup.parent && !flowerGroup.parent.userData?.isFlowerGroup && flowerGroup.parent.parent) {
-          flowerGroup = flowerGroup.parent;
-        }
-        const pos = new THREE.Vector3();
-        (flowerGroup.userData?.isFlowerGroup ? flowerGroup : obj).getWorldPosition(pos);
-        pos.y += 2.5;
-        setHintState({ text: '✦ it might spin ✦', position: pos.toArray() });
-      } else {
-        document.body.style.cursor = 'auto';
-        setHintState(null);
-      }
-    }
-  };
-
-  const handlePointerOut = () => {
-    document.body.style.cursor = 'auto';
-    setHintState(null);
-  };
-
   return (
     <>
       <primitive
         object={model}
         onClick={handleClick}
-        onPointerOver={handlePointerOver}
-        onPointerOut={handlePointerOut}
       />
 
       {/* ── 3D Text Overlay positioned directly on screen face ── */}
