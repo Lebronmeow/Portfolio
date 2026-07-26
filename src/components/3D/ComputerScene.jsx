@@ -1,21 +1,37 @@
-import React, { useRef, useEffect, useState, Suspense, useCallback } from 'react';
-import { Canvas, useThree, useFrame } from '@react-three/fiber';
-import { OrbitControls, OrthographicCamera, Text, useGLTF } from '@react-three/drei';
-import gsap from 'gsap';
-import * as THREE from 'three';
-import { KTX2Loader } from 'three/examples/jsm/loaders/KTX2Loader.js';
-import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
-import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import React, {
+  useRef,
+  useEffect,
+  useState,
+  Suspense,
+  useCallback,
+} from "react";
+import { Canvas, useThree, useFrame } from "@react-three/fiber";
+import {
+  OrbitControls,
+  OrthographicCamera,
+  Text,
+  useGLTF,
+  useAnimations,
+} from "@react-three/drei";
+import gsap from "gsap";
+import * as THREE from "three";
+import { KTX2Loader } from "three/examples/jsm/loaders/KTX2Loader.js";
+import { DRACOLoader } from "three/examples/jsm/loaders/DRACOLoader.js";
+import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 
 // ─── Grid Floor ───────────────────────────────────────────────────────────────
 function GridFloor() {
   return (
     <group position={[0, -0.01, 0]}>
-      <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.005, 0]}>
+      <mesh
+        receiveShadow
+        rotation={[-Math.PI / 2, 0, 0]}
+        position={[0, -0.005, 0]}
+      >
         <planeGeometry args={[100, 100]} />
         <meshStandardMaterial color="#111114" roughness={0.9} metalness={0.1} />
       </mesh>
-      <gridHelper args={[40, 40, '#44444c', '#26262b']} position={[0, 0, 0]} />
+      <gridHelper args={[40, 40, "#44444c", "#26262b"]} position={[0, 0, 0]} />
     </group>
   );
 }
@@ -24,48 +40,53 @@ function GridFloor() {
 function isStrictScreenTarget(obj) {
   if (!obj || !obj.material) return false;
   const mat = obj.material;
-  if (Array.isArray(mat)) return mat.some((m) => m && m.name === 'Monitor Screen');
-  return mat.name === 'Monitor Screen';
+  if (Array.isArray(mat))
+    return mat.some((m) => m && m.name === "Monitor Screen");
+  return mat.name === "Monitor Screen";
 }
 
 // ─── Mechanical Keyboard Sound ──────────────────────────────────────────
 let audioCtx = null;
 
 // ─── Mechanical Keyboard Sound ──────────────────────────────────────────
-const KEYBOARD_SOUND_URL = 'https://raw.githubusercontent.com/Nigh/OpenClickSound/main/Sound/01/kt01-click-03-01.wav';
+const KEYBOARD_SOUND_URL =
+  "https://raw.githubusercontent.com/Nigh/OpenClickSound/main/Sound/01/kt01-click-03-01.wav";
 const keyboardAudio = new Audio(KEYBOARD_SOUND_URL);
 keyboardAudio.volume = 0.4;
-keyboardAudio.preload = 'auto';
+keyboardAudio.preload = "auto";
 
 function playKeyClick() {
   try {
     const clone = keyboardAudio.cloneNode();
     clone.volume = 0.4;
     clone.play().catch(() => {});
-  } catch (e) { /* silent */ }
+  } catch (e) {
+    /* silent */
+  }
 }
 
-
 // ─── Swirl Sound ────────────────────────────────────────────────────────
-const SWIRL_SOUND_URL = 'https://remotion.media/whoosh.wav';
+const SWIRL_SOUND_URL = "https://remotion.media/whoosh.wav";
 const swirlAudio = new Audio(SWIRL_SOUND_URL);
 swirlAudio.volume = 0.3;
-swirlAudio.preload = 'auto';
+swirlAudio.preload = "auto";
 
 function playSwirl() {
   try {
     const clone = swirlAudio.cloneNode();
     clone.volume = 0.3;
     clone.play().catch(() => {});
-  } catch (e) { /* silent */ }
+  } catch (e) {
+    /* silent */
+  }
 }
 
 // ─── Check if a mesh is a keyboard key ────────────────────────────────
 function isKeyboardKey(obj) {
   if (!obj || !obj.isMesh) return false;
-  const name = obj.name?.toLowerCase() || '';
+  const name = obj.name?.toLowerCase() || "";
   // Keyboard keys are at y≈0.48 on the desk — Extruded010–036 + Spacebar
-  if (name === 'spacebar') return true;
+  if (name === "spacebar") return true;
   if (!/^extruded\d+$/.test(name)) return false;
   // Check Y position to avoid catching other "Extruded" objects (flower, etc.)
   return obj.position.y > 0.4 && obj.position.y < 0.6;
@@ -123,62 +144,85 @@ function MainModel({ onEnter }) {
         lastHovered.current = obj;
 
         if (isStrictScreenTarget(obj)) {
-          document.body.style.cursor = 'pointer';
+          document.body.style.cursor = "pointer";
           setHintState(null);
         } else if (obj.userData?.isKey) {
-          document.body.style.cursor = 'pointer';
+          document.body.style.cursor = "pointer";
           const keyPos = new THREE.Vector3();
           obj.getWorldPosition(keyPos);
           keyPos.y += 0.6;
-          setHintState({ text: '⌨️ try clicking keys ⌨️', position: keyPos.toArray() });
+          setHintState({
+            text: "⌨️ try clicking keys ⌨️",
+            position: keyPos.toArray(),
+          });
         } else if (obj.userData?.isVase) {
-          document.body.style.cursor = 'pointer';
+          document.body.style.cursor = "pointer";
           const pos = new THREE.Vector3();
           obj.getWorldPosition(pos);
           pos.y += 2.0;
-          setHintState({ text: 'give it a spin', position: pos.toArray() });
+          setHintState({ text: "give it a spin", position: pos.toArray() });
         } else if (obj.userData?.isFlower) {
-          document.body.style.cursor = 'grab';
+          document.body.style.cursor = "grab";
           let flowerGroup = obj;
-          while (flowerGroup.parent && !flowerGroup.parent.userData?.isFlowerGroup && flowerGroup.parent.parent) {
+          while (
+            flowerGroup.parent &&
+            !flowerGroup.parent.userData?.isFlowerGroup &&
+            flowerGroup.parent.parent
+          ) {
             flowerGroup = flowerGroup.parent;
           }
           const pos = new THREE.Vector3();
-          (flowerGroup.userData?.isFlowerGroup ? flowerGroup : obj).getWorldPosition(pos);
+          (flowerGroup.userData?.isFlowerGroup
+            ? flowerGroup
+            : obj
+          ).getWorldPosition(pos);
           pos.y += 3.5;
-          setHintState({ text: '✦ it might spin ✦', position: pos.toArray() });
+          setHintState({ text: "✦ it might spin ✦", position: pos.toArray() });
         } else {
           let isFlowerDescendant = false;
           let p = obj.parent;
           while (p) {
-            if (p.userData?.isFlowerGroup) { isFlowerDescendant = true; break; }
+            if (p.userData?.isFlowerGroup) {
+              isFlowerDescendant = true;
+              break;
+            }
             p = p.parent;
           }
           if (isFlowerDescendant) {
-            document.body.style.cursor = 'grab';
+            document.body.style.cursor = "grab";
             let flowerGroup = obj;
-            while (flowerGroup.parent && !flowerGroup.parent.userData?.isFlowerGroup && flowerGroup.parent.parent) {
+            while (
+              flowerGroup.parent &&
+              !flowerGroup.parent.userData?.isFlowerGroup &&
+              flowerGroup.parent.parent
+            ) {
               flowerGroup = flowerGroup.parent;
             }
             const pos = new THREE.Vector3();
-            (flowerGroup.userData?.isFlowerGroup ? flowerGroup : obj).getWorldPosition(pos);
+            (flowerGroup.userData?.isFlowerGroup
+              ? flowerGroup
+              : obj
+            ).getWorldPosition(pos);
             pos.y += 3.5;
-            setHintState({ text: '✦ it might spin ✦', position: pos.toArray() });
+            setHintState({
+              text: "✦ it might spin ✦",
+              position: pos.toArray(),
+            });
           } else {
             lastHovered.current = null;
-            document.body.style.cursor = 'auto';
+            document.body.style.cursor = "auto";
             setHintState(null);
           }
         }
       } else if (lastHovered.current !== null) {
         lastHovered.current = null;
-        document.body.style.cursor = 'auto';
+        document.body.style.cursor = "auto";
         setHintState(null);
       }
     };
 
-    canvas.addEventListener('pointermove', handleMouseMove);
-    return () => canvas.removeEventListener('pointermove', handleMouseMove);
+    canvas.addEventListener("pointermove", handleMouseMove);
+    return () => canvas.removeEventListener("pointermove", handleMouseMove);
   }, [gl, model, pointer, raycaster, camera]);
 
   useEffect(() => {
@@ -186,15 +230,17 @@ function MainModel({ onEnter }) {
 
     const manager = new THREE.LoadingManager();
     manager.setURLModifier((url) => {
-      if (/ishu\.jpg/.test(url)) return '/assets/Polaroid/ishu_1.jpg';
+      if (/ishu\.jpg/.test(url)) return "/assets/Polaroid/ishu_1.jpg";
       return url;
     });
 
     const dracoLoader = new DRACOLoader();
-    dracoLoader.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.6/');
+    dracoLoader.setDecoderPath(
+      "https://www.gstatic.com/draco/versioned/decoders/1.5.6/",
+    );
 
     const ktx2Loader = new KTX2Loader(manager);
-    ktx2Loader.setTranscoderPath('/libs/basis/');
+    ktx2Loader.setTranscoderPath("/libs/basis/");
     ktx2Loader.detectSupport(gl);
 
     const loader = new GLTFLoader(manager);
@@ -202,7 +248,7 @@ function MainModel({ onEnter }) {
     loader.setKTX2Loader(ktx2Loader);
 
     loader.load(
-      '/deploy-models/mainscene.glb',
+      "/deploy-models/mainscene.glb",
       (gltf) => {
         if (!isMounted) return;
         const loadedScene = gltf.scene;
@@ -216,38 +262,38 @@ function MainModel({ onEnter }) {
 
             // These are the stickers on the right side of the desk to keep
             const isRightSideSticker =
-              lower.includes('mid_sticker') ||
-              lower.includes('bottom_sticker.002') ||
-              lower.includes('filler_sticker.005') ||
-              lower.includes('leftmost_sticker.001');
+              lower.includes("mid_sticker") ||
+              lower.includes("bottom_sticker.002") ||
+              lower.includes("filler_sticker.005") ||
+              lower.includes("leftmost_sticker.001");
 
             if (
-              lower.includes('flippedcard') ||
-              lower.includes('polaroid') ||
-              (lower.includes('sticker') && !isRightSideSticker) ||
-              lower.includes('marker') ||
-              lower.includes('plane') ||
-              lower.includes('this_is_me') ||
-              lower.includes('this me') ||
-              lower.startsWith('extruded.06') ||
-              lower.startsWith('extruded.07') ||
-              lower.includes('shadow') ||
-              lower.includes('solid.00') ||
-              lower.includes('quad') ||
-              lower.includes('ground') ||
-              lower.includes('rect') ||
-              lower.includes('floor') ||
-              lower.includes('dino') ||
-              lower.includes('raptor') ||
-              lower.includes('lottiemon') ||
-              lower.includes('car') ||
-              lower.includes('vehicle') ||
-              lower.includes('ae86') ||
-              lower.includes('86') ||
-              lower.includes('toyota') ||
-              lower.includes('hatchback') ||
-              lower.includes('sprinter') ||
-              lower.includes('corolla')
+              lower.includes("flippedcard") ||
+              lower.includes("polaroid") ||
+              (lower.includes("sticker") && !isRightSideSticker) ||
+              lower.includes("marker") ||
+              lower.includes("plane") ||
+              lower.includes("this_is_me") ||
+              lower.includes("this me") ||
+              lower.startsWith("extruded.06") ||
+              lower.startsWith("extruded.07") ||
+              lower.includes("shadow") ||
+              lower.includes("solid.00") ||
+              lower.includes("quad") ||
+              lower.includes("ground") ||
+              lower.includes("rect") ||
+              lower.includes("floor") ||
+              lower.includes("dino") ||
+              lower.includes("raptor") ||
+              lower.includes("lottiemon") ||
+              lower.includes("car") ||
+              lower.includes("vehicle") ||
+              lower.includes("ae86") ||
+              lower.includes("86") ||
+              lower.includes("toyota") ||
+              lower.includes("hatchback") ||
+              lower.includes("sprinter") ||
+              lower.includes("corolla")
             ) {
               obj.visible = false;
               obj.scale.set(0, 0, 0);
@@ -257,16 +303,18 @@ function MainModel({ onEnter }) {
 
           // Also hide by material to perfectly catch all cards and sticky notes
           if (obj.material) {
-            const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
-            mats.forEach(m => {
+            const mats = Array.isArray(obj.material)
+              ? obj.material
+              : [obj.material];
+            mats.forEach((m) => {
               if (m && m.name) {
                 const mLower = m.name.toLowerCase();
                 if (
-                  mLower.includes('sticky note') ||
-                  mLower.includes('motion card') ||
-                  mLower.includes('polaroid') ||
-                  mLower === 'tape' ||
-                  mLower.includes('shadow')
+                  mLower.includes("sticky note") ||
+                  mLower.includes("motion card") ||
+                  mLower.includes("polaroid") ||
+                  mLower === "tape" ||
+                  mLower.includes("shadow")
                 ) {
                   obj.visible = false;
                   obj.scale.set(0, 0, 0);
@@ -282,7 +330,7 @@ function MainModel({ onEnter }) {
               obj.userData.isKey = true;
             }
             // ── Mark flowers (extruded meshes NOT at keyboard height or on the computer) ──
-            const name = obj.name?.toLowerCase() || '';
+            const name = obj.name?.toLowerCase() || "";
             if (/^extruded\d+$/.test(name) && !obj.userData.isKey) {
               // Exclude objects attached to the computer/monitor (orange button, etc.)
               const isOnComputer = (() => {
@@ -290,8 +338,16 @@ function MainModel({ onEnter }) {
                 if (obj.position.y > 0.6) return true;
                 let p = obj.parent;
                 while (p) {
-                  const pn = p.name?.toLowerCase() || '';
-                  if (pn.includes('computer') || pn.includes('monitor') || pn.includes('screen') || pn.includes('button') || pn.includes('case') || pn.includes('desk')) return true;
+                  const pn = p.name?.toLowerCase() || "";
+                  if (
+                    pn.includes("computer") ||
+                    pn.includes("monitor") ||
+                    pn.includes("screen") ||
+                    pn.includes("button") ||
+                    pn.includes("case") ||
+                    pn.includes("desk")
+                  )
+                    return true;
                   p = p.parent;
                 }
                 return false;
@@ -310,24 +366,28 @@ function MainModel({ onEnter }) {
             }
 
             // ── Mark vase objects ──
-            const nameLower = obj.name?.toLowerCase() || '';
-            if (nameLower.includes('vase') || nameLower.includes('pot') || nameLower === 'cup') {
+            const nameLower = obj.name?.toLowerCase() || "";
+            if (
+              nameLower.includes("vase") ||
+              nameLower.includes("pot") ||
+              nameLower === "cup"
+            ) {
               obj.userData.isVase = true;
             }
 
             // Hide any floor-level dark rectangles (shadow planes, markers, etc.)
             if (obj.position.y > -0.05 && obj.position.y < 0.1) {
-              const n = obj.name?.toLowerCase() || '';
+              const n = obj.name?.toLowerCase() || "";
               const isDeskOrModelPart =
-                n.includes('monitor') ||
-                n.includes('screen') ||
-                n.includes('desk') ||
-                n.includes('keyboard') ||
-                n.includes('stand') ||
-                n.includes('case') ||
-                n.includes('extruded') ||
-                n.includes('cylinder') ||
-                n.includes('leg');
+                n.includes("monitor") ||
+                n.includes("screen") ||
+                n.includes("desk") ||
+                n.includes("keyboard") ||
+                n.includes("stand") ||
+                n.includes("case") ||
+                n.includes("extruded") ||
+                n.includes("cylinder") ||
+                n.includes("leg");
               if (!isDeskOrModelPart) {
                 obj.visible = false;
                 obj.scale.set(0, 0, 0);
@@ -341,10 +401,10 @@ function MainModel({ onEnter }) {
             const mat = obj.material;
 
             // ── Find the Monitor Screen mesh ──
-            if (mat && !Array.isArray(mat) && mat.name === 'Monitor Screen') {
+            if (mat && !Array.isArray(mat) && mat.name === "Monitor Screen") {
               // Replace with a plain dark CRT material (no texture needed)
-              const darkMat = new THREE.MeshBasicMaterial({ color: '#0d0d1a' });
-              darkMat.name = 'Monitor Screen';
+              const darkMat = new THREE.MeshBasicMaterial({ color: "#0d0d1a" });
+              darkMat.name = "Monitor Screen";
               obj.material = darkMat;
               screenMatRef.current = darkMat;
 
@@ -367,7 +427,9 @@ function MainModel({ onEnter }) {
                   avgNormal.z += nAttr.getZ(i);
                 }
                 avgNormal.normalize();
-                const normalMatrix = new THREE.Matrix3().getNormalMatrix(obj.matrixWorld);
+                const normalMatrix = new THREE.Matrix3().getNormalMatrix(
+                  obj.matrixWorld,
+                );
                 avgNormal.applyMatrix3(normalMatrix).normalize();
               } else {
                 // Fallback: assume screen faces forward-right (toward isometric camera)
@@ -375,7 +437,9 @@ function MainModel({ onEnter }) {
               }
 
               // Position text slightly in front of screen surface
-              const textPos = center.clone().add(avgNormal.clone().multiplyScalar(0.03));
+              const textPos = center
+                .clone()
+                .add(avgNormal.clone().multiplyScalar(0.03));
 
               // Compute text rotation:
               // We want the text to face the viewer, so we look at a point in front of the screen along the normal.
@@ -391,7 +455,11 @@ function MainModel({ onEnter }) {
 
               setScreenData({
                 position: textPos.toArray(),
-                rotation: [helper.rotation.x, helper.rotation.y, helper.rotation.z],
+                rotation: [
+                  helper.rotation.x,
+                  helper.rotation.y,
+                  helper.rotation.z,
+                ],
                 fontSize: screenWidth * 0.065,
               });
             } else if (mat && !Array.isArray(mat) && mat.map) {
@@ -402,9 +470,11 @@ function MainModel({ onEnter }) {
             // Handle array materials (just in case)
             if (Array.isArray(mat)) {
               mat.forEach((m, idx) => {
-                if (m && m.name === 'Monitor Screen') {
-                  const darkMat = new THREE.MeshBasicMaterial({ color: '#0d0d1a' });
-                  darkMat.name = 'Monitor Screen';
+                if (m && m.name === "Monitor Screen") {
+                  const darkMat = new THREE.MeshBasicMaterial({
+                    color: "#0d0d1a",
+                  });
+                  darkMat.name = "Monitor Screen";
                   obj.material[idx] = darkMat;
                   screenMatRef.current = darkMat;
                 }
@@ -421,8 +491,8 @@ function MainModel({ onEnter }) {
       },
       undefined,
       (err) => {
-        console.error('GLB mainscene load error:', err);
-      }
+        console.error("GLB mainscene load error:", err);
+      },
     );
 
     return () => {
@@ -453,14 +523,14 @@ function MainModel({ onEnter }) {
       gsap.to(key.position, {
         y: key.position.y - pressDepth,
         duration: 0.1,
-        ease: 'power3.in',
-        overwrite: 'auto',
+        ease: "power3.in",
+        overwrite: "auto",
         onComplete: () => {
           gsap.to(key.position, {
             y: key.position.y + pressDepth,
             duration: 0.15,
-            ease: 'power2.out',
-            overwrite: 'auto',
+            ease: "power2.out",
+            overwrite: "auto",
             onComplete: () => pressingKeys.current.delete(id),
           });
         },
@@ -472,7 +542,11 @@ function MainModel({ onEnter }) {
     if (e.object.userData?.isFlower) {
       // Walk up to find the flower group parent
       let flowerGroup = e.object;
-      while (flowerGroup.parent && !flowerGroup.parent.userData?.isFlowerGroup && flowerGroup.parent.parent) {
+      while (
+        flowerGroup.parent &&
+        !flowerGroup.parent.userData?.isFlowerGroup &&
+        flowerGroup.parent.parent
+      ) {
         flowerGroup = flowerGroup.parent;
       }
       if (flowerGroup.parent?.userData?.isFlowerGroup) {
@@ -486,8 +560,8 @@ function MainModel({ onEnter }) {
       gsap.to(flowerGroup.rotation, {
         y: flowerGroup.rotation.y + Math.PI * 2,
         duration: 1.0,
-        ease: 'power3.inOut',
-        overwrite: 'auto',
+        ease: "power3.inOut",
+        overwrite: "auto",
         onComplete: () => pressingKeys.current.delete(id),
       });
     }
@@ -495,10 +569,7 @@ function MainModel({ onEnter }) {
 
   return (
     <>
-      <primitive
-        object={model}
-        onClick={handleClick}
-      />
+      <primitive object={model} onClick={handleClick} />
 
       {/* ── 3D Text Overlay positioned directly on screen face ── */}
       {screenData && (
@@ -519,10 +590,10 @@ function MainModel({ onEnter }) {
             onEnter?.();
           }}
           onPointerOver={() => {
-            document.body.style.cursor = 'pointer';
+            document.body.style.cursor = "pointer";
           }}
           onPointerOut={() => {
-            document.body.style.cursor = 'auto';
+            document.body.style.cursor = "auto";
           }}
         >
           PORTFOLIO
@@ -551,7 +622,15 @@ function MainModel({ onEnter }) {
 }
 
 // ─── Interactive Floor Label ──────────────────────────────────────────────
-function FloorLabel({ children, fontSize, color, position, letterSpacing, riseAmount = 0.6, onClick }) {
+function FloorLabel({
+  children,
+  fontSize,
+  color,
+  position,
+  letterSpacing,
+  riseAmount = 0.6,
+  onClick,
+}) {
   const groupRef = useRef();
   const textRef = useRef();
   const hovering = useRef(false);
@@ -572,17 +651,17 @@ function FloorLabel({ children, fontSize, color, position, letterSpacing, riseAm
     gsap.to(groupRef.current.position, {
       y: baseY + riseAmount,
       duration: 0.45,
-      ease: 'power3.out',
-      overwrite: 'auto',
+      ease: "power3.out",
+      overwrite: "auto",
     });
     // Counteract text's -PI/2 flat rotation + add upward tilt toward viewer
     gsap.to(groupRef.current.rotation, {
       x: Math.PI / 2 - 0.5,
       duration: 0.5,
-      ease: 'power2.out',
-      overwrite: 'auto',
+      ease: "power2.out",
+      overwrite: "auto",
     });
-    document.body.style.cursor = onClick ? 'pointer' : 'default';
+    document.body.style.cursor = onClick ? "pointer" : "default";
   };
 
   const handleOut = (e) => {
@@ -592,24 +671,27 @@ function FloorLabel({ children, fontSize, color, position, letterSpacing, riseAm
     gsap.to(groupRef.current.position, {
       y: baseY,
       duration: 0.5,
-      ease: 'power2.out',
-      overwrite: 'auto',
+      ease: "power2.out",
+      overwrite: "auto",
     });
     // Reset group rotation so only text's own -PI/2 applies (flat on floor)
     gsap.to(groupRef.current.rotation, {
       x: 0,
       duration: 0.55,
-      ease: 'power2.inOut',
-      overwrite: 'auto',
+      ease: "power2.inOut",
+      overwrite: "auto",
     });
     // Delay reset so re-hover within 200ms is seamless
-    gsap.delayedCall(0.2, () => { hovering.current = false; });
-    if (!onClick) document.body.style.cursor = 'auto';
+    gsap.delayedCall(0.2, () => {
+      hovering.current = false;
+    });
+    if (!onClick) document.body.style.cursor = "auto";
   };
 
   // Approximate text width based on chars, font size, and letter spacing
-  const textStr = typeof children === 'string' ? children : '';
-  const approxTextWidth = textStr.length * fontSize * (0.5 + (letterSpacing || 0));
+  const textStr = typeof children === "string" ? children : "";
+  const approxTextWidth =
+    textStr.length * fontSize * (0.5 + (letterSpacing || 0));
   const hitboxW = Math.max(approxTextWidth * 1.3, 1.2);
   const hitboxD = Math.max(fontSize * 1.3, 0.5);
   const hitboxX = approxTextWidth * 0.5;
@@ -621,11 +703,19 @@ function FloorLabel({ children, fontSize, color, position, letterSpacing, riseAm
         position={[hitboxX, 0, 0]}
         onPointerOver={handleOver}
         onPointerOut={handleOut}
-        onClick={(e) => { e.stopPropagation(); onClick?.(); }}
+        onClick={(e) => {
+          e.stopPropagation();
+          onClick?.();
+        }}
         renderOrder={0}
       >
         <boxGeometry args={[hitboxW, 0.02, hitboxD]} />
-        <meshBasicMaterial transparent opacity={0} depthWrite={false} depthTest={false} />
+        <meshBasicMaterial
+          transparent
+          opacity={0}
+          depthWrite={false}
+          depthTest={false}
+        />
       </mesh>
       {/* Visual 3D text lying flat on the floor */}
       <Text
@@ -646,139 +736,172 @@ function FloorLabel({ children, fontSize, color, position, letterSpacing, riseAm
 }
 
 // ─── Floor Labels ─────────────────────────────────────────────────────────
-function FloorLabels() {
+function FloorLabels({ onNavigate }) {
   return (
     <group position={[0, 0.02, 0]}>
       {/* Left Navigation */}
       <group position={[-7.2, 0, -4.2]}>
-        <FloorLabel fontSize={0.48} color="#ffffff" position={[0, 0, 0]} riseAmount={0.5}>
+        <FloorLabel
+          fontSize={0.7}
+          color="#ffffff"
+          position={[0, 0, 0]}
+          riseAmount={0.6}
+          onClick={() => onNavigate?.('work')}
+        >
           WORK
         </FloorLabel>
-        <FloorLabel fontSize={0.48} color="#ffffff" position={[0, 0, 0.9]} riseAmount={0.5}>
+        <FloorLabel
+          fontSize={0.7}
+          color="#ffffff"
+          position={[0, 0, 1.2]}
+          riseAmount={0.6}
+          onClick={() => onNavigate?.('game')}
+        >
           GAME
         </FloorLabel>
-        <FloorLabel fontSize={0.48} color="#ffffff" position={[0, 0, 1.8]} riseAmount={0.5}>
+        <FloorLabel
+          fontSize={0.7}
+          color="#ffffff"
+          position={[0, 0, 2.4]}
+          riseAmount={0.6}
+          onClick={() => onNavigate?.('chat')}
+        >
           CHAT
         </FloorLabel>
-        <FloorLabel fontSize={0.48} color="#ffffff" position={[0, 0, 2.7]} riseAmount={0.5}>
+        <FloorLabel
+          fontSize={0.7}
+          color="#ffffff"
+          position={[0, 0, 3.6]}
+          riseAmount={0.6}
+          onClick={() => onNavigate?.('resume')}
+        >
           RESUME
         </FloorLabel>
       </group>
 
       {/* Right Name */}
       <FloorLabel
-        fontSize={0.68}
-        color="#ffffff"
+        fontSize={0.45}
+        color="#888899"
+        letterSpacing={0.08}
+        position={[6.2, 0, -4.5]}
+        riseAmount={0.5}
+      >
+        Hi! I am
+      </FloorLabel>
+      <FloorLabel
+        fontSize={0.9}
+        color="#facc15"
         letterSpacing={0.1}
         position={[6.2, 0, -3.5]}
         riseAmount={0.7}
       >
-        LEBRON
-      </FloorLabel>
-      <FloorLabel
-        fontSize={0.28}
-        color="#888899"
-        letterSpacing={0.15}
-        position={[6.2, 0, -2.6]}
-        riseAmount={0.5}
-      >
-        VIBE CODER
+        LEBRON PEREIRA
       </FloorLabel>
 
       {/* Social Footer — heading */}
       <FloorLabel
-        fontSize={0.26}
+        fontSize={0.4}
         color="#888899"
-        position={[-7.2, 0, 3.6]}
-        riseAmount={0.4}
+        position={[-7.2, 0, 4.5]}
+        riseAmount={0.5}
       >
         LET'S CONNECT
       </FloorLabel>
 
       {/* Social Footer — separate clickable links in yellow */}
       <FloorLabel
-        fontSize={0.22}
+        fontSize={0.35}
         color="#facc15"
         letterSpacing={0.05}
-        position={[-7.2, 0, 4.0]}
-        riseAmount={0.4}
-        onClick={() => window.location.href = 'mailto:lebronpereira7@gmail.com'}
+        position={[-7.2, 0, 5.2]}
+        riseAmount={0.5}
+        onClick={() =>
+          (window.location.href = "mailto:lebronpereira7@gmail.com")
+        }
       >
-        MAIL
+        ✉ MAIL
       </FloorLabel>
       <FloorLabel
-        fontSize={0.22}
+        fontSize={0.35}
         color="#facc15"
         letterSpacing={0.05}
-        position={[-7.2, 0, 4.4]}
-        riseAmount={0.4}
-        onClick={() => window.open('https://in.linkedin.com/in/lebron-pereira-707079350', '_blank')}
+        position={[-7.2, 0, 5.9]}
+        riseAmount={0.5}
+        onClick={() =>
+          window.open(
+            "https://in.linkedin.com/in/lebron-pereira-707079350",
+            "_blank",
+          )
+        }
       >
-        LINKEDIN
+        🔗 LINKEDIN
       </FloorLabel>
       <FloorLabel
-        fontSize={0.22}
+        fontSize={0.35}
         color="#facc15"
         letterSpacing={0.05}
-        position={[-7.2, 0, 4.8]}
-        riseAmount={0.4}
-        onClick={() => window.open('https://github.com/Lebronmeow', '_blank')}
+        position={[-7.2, 0, 6.6]}
+        riseAmount={0.5}
+        onClick={() => window.open("https://github.com/Lebronmeow", "_blank")}
       >
-        GITHUB
+        🐙 GITHUB
       </FloorLabel>
     </group>
   );
 }
 
 // ─── Cat Meow Sound ──────────────────────────────────────────────────────
-const MEOW_SOUND_URL = 'https://raw.githubusercontent.com/Mirajjj/claude-meow-sound-notifications/main/sounds/meow_1_normal.wav';
+const MEOW_SOUND_URL = "/sounds/cat-meow.mp3";
 const meowAudio = new Audio(MEOW_SOUND_URL);
 meowAudio.volume = 0.6;
-meowAudio.preload = 'auto';
+meowAudio.preload = "auto";
 
 function playMeow() {
   try {
     const clone = meowAudio.cloneNode();
     clone.volume = 0.6;
     clone.play().catch(() => {});
-  } catch (e) { /* silent */ }
+  } catch (e) {
+    /* silent */
+  }
 }
 
 // ─── Cat Model (loaded from GLB) ────────────────────────────────────────
-const CAT_URL = 'https://raw.githubusercontent.com/Hajorda/KeduGallery/main/assets/cat.glb';
-
-
+const CAT_URL = "/models/cat.glb";
 
 // ─── Hover Hint (Floating Tooltip) ─────────────────────────────────────
-function HoverHint({ position, text }) {
+function HoverHint({ position, text, floatHeight = 0.35 }) {
   const [visible, setVisible] = useState(false);
   const textRef = useRef();
   const hoverCount = useRef(0);
+  const baseY = floatHeight;
 
   useEffect(() => {
     if (!textRef.current) return;
+    const y = baseY;
     if (visible) {
       gsap.killTweensOf(textRef.current.position);
       gsap.to(textRef.current.position, {
-        y: 0.5,
+        y: y + 0.15,
         duration: 0.35,
-        ease: 'power2.out',
-        overwrite: 'auto',
+        ease: "power2.out",
+        overwrite: "auto",
         onComplete: () => {
           gsap.to(textRef.current.position, {
-            y: 0.4,
+            y: y + 0.05,
             duration: 1.0,
             yoyo: true,
             repeat: -1,
-            ease: 'sine.inOut',
+            ease: "sine.inOut",
           });
         },
       });
     } else {
       gsap.killTweensOf(textRef.current.position);
-      if (textRef.current.position) textRef.current.position.y = 0.35;
+      if (textRef.current.position) textRef.current.position.y = y - 0.05;
     }
-  }, [visible]);
+  }, [visible, baseY]);
 
   const handleOver = (e) => {
     e.stopPropagation();
@@ -836,7 +959,28 @@ function HoverHint({ position, text }) {
 function CatModel() {
   const groupRef = useRef();
   const busy = useRef(false);
-  const { scene } = useGLTF(CAT_URL);
+  const { scene, animations } = useGLTF(CAT_URL);
+  const { actions } = useAnimations(animations, groupRef);
+
+  // Play first animation loop
+  useEffect(() => {
+    const action = actions?.[Object.keys(actions || {})[0]];
+    if (action) {
+      action.reset();
+      action.play();
+    }
+  }, [actions]);
+
+  // Enable shadows on all meshes
+  useEffect(() => {
+    if (!scene) return;
+    scene.traverse((obj) => {
+      if (obj.isMesh) {
+        obj.castShadow = true;
+        obj.receiveShadow = true;
+      }
+    });
+  }, [scene]);
 
   // Enable shadows on all meshes
   useEffect(() => {
@@ -863,80 +1007,128 @@ function CatModel() {
 
     // 2. Walk in a small circle and return
     const tl = gsap.timeline({
-      onComplete: () => { busy.current = false; },
+      onComplete: () => {
+        busy.current = false;
+      },
     });
 
     const ARC = Math.PI * 0.8;
 
-    tl.to(target.rotation, {
-      y: originalRot + ARC,
-      duration: 0.6,
-      ease: 'power2.inOut',
-    }, 0)
-    .to(target.rotation, {
-      y: originalRot,
-      duration: 0.6,
-      ease: 'power2.inOut',
-    }, 0.6);
+    tl.to(
+      target.rotation,
+      {
+        y: originalRot + ARC,
+        duration: 0.6,
+        ease: "power2.inOut",
+      },
+      0,
+    ).to(
+      target.rotation,
+      {
+        y: originalRot,
+        duration: 0.6,
+        ease: "power2.inOut",
+      },
+      0.6,
+    );
 
-    tl.to(target.position, {
-      x: originalPos.x - 0.4,
-      z: originalPos.z - 0.3,
-      duration: 0.7,
-      ease: 'power2.inOut',
-    }, 0)
-    .to(target.position, {
-      x: originalPos.x + 0.4,
-      z: originalPos.z + 0.3,
-      duration: 0.7,
-      ease: 'power2.inOut',
-    }, 0.6)
-    .to(target.position, {
-      x: originalPos.x,
-      z: originalPos.z,
-      duration: 0.5,
-      ease: 'power2.inOut',
-    }, 1.3);
+    tl.to(
+      target.position,
+      {
+        x: originalPos.x - 0.4,
+        z: originalPos.z - 0.3,
+        duration: 0.7,
+        ease: "power2.inOut",
+      },
+      0,
+    )
+      .to(
+        target.position,
+        {
+          x: originalPos.x + 0.4,
+          z: originalPos.z + 0.3,
+          duration: 0.7,
+          ease: "power2.inOut",
+        },
+        0.6,
+      )
+      .to(
+        target.position,
+        {
+          x: originalPos.x,
+          z: originalPos.z,
+          duration: 0.5,
+          ease: "power2.inOut",
+        },
+        1.3,
+      );
   };
 
   return (
     <group
       ref={groupRef}
-      position={[4.57, 0.1, -0.30]}
-      rotation={[0, 1.57, 0]}
-      scale={[0.15, 0.15, 0.15]}
+      position={[4.57, 0.1, -0.3]}
+      rotation={[0, -1.57, 0]}
+      scale={[0.1, 0.1, 0.1]}
       onClick={handleClick}
-      onPointerOver={(e) => { e.stopPropagation(); document.body.style.cursor = 'pointer'; }}
-      onPointerOut={() => { document.body.style.cursor = 'auto'; }}
+      onPointerOver={(e) => {
+        e.stopPropagation();
+        document.body.style.cursor = "pointer";
+      }}
+      onPointerOut={() => {
+        document.body.style.cursor = "auto";
+      }}
     >
       <primitive object={scene} />
     </group>
   );
 }
 
-
-
 // ─── Porsche Engine Sounds ────────────────────────────────────────────
-const PORSCHE_START_URL = 'https://soundfxcenter.com/transport/car/8d82b5_Porsche_Start_Sound_Effect.mp3';
-const PORSCHE_MOVE_URL = 'https://soundfxcenter.com/transport/car/8d82b5_Porsche_Move_Sound_Effect.mp3';
+const PORSCHE_START_URL =
+  "https://soundfxcenter.com/transport/car/8d82b5_Porsche_Start_Sound_Effect.mp3";
+const PORSCHE_MOVE_URL =
+  "https://soundfxcenter.com/transport/car/8d82b5_Porsche_Move_Sound_Effect.mp3";
+const DRIFT_SCREECH_URL = "https://lasonotheque.org/UPLOAD/mp3/2368.mp3";
 const porscheStartAudio = new Audio(PORSCHE_START_URL);
 porscheStartAudio.volume = 0.5;
-porscheStartAudio.preload = 'auto';
+porscheStartAudio.preload = "auto";
 const porscheMoveAudio = new Audio(PORSCHE_MOVE_URL);
 porscheMoveAudio.volume = 0.4;
-porscheMoveAudio.preload = 'auto';
+porscheMoveAudio.preload = "auto";
+const driftScreechAudio = new Audio(DRIFT_SCREECH_URL);
+driftScreechAudio.volume = 0.3;
+driftScreechAudio.preload = "auto";
 
 function playPorscheStart() {
-  try { porscheStartAudio.cloneNode().play().catch(() => {}); } catch (e) {}
+  try {
+    porscheStartAudio
+      .cloneNode()
+      .play()
+      .catch(() => {});
+  } catch (e) {}
 }
 function playPorscheMove() {
-  try { porscheMoveAudio.cloneNode().play().catch(() => {}); } catch (e) {}
+  try {
+    porscheMoveAudio
+      .cloneNode()
+      .play()
+      .catch(() => {});
+  } catch (e) {}
+}
+function playDriftScreech() {
+  try {
+    driftScreechAudio
+      .cloneNode()
+      .play()
+      .catch(() => {});
+  } catch (e) {}
 }
 
 // ─── Porsche Model with click-to-drift animation ───────────────────────
 function PorscheModel() {
   const groupRef = useRef();
-  const { scene } = useGLTF('/models/porsche.glb');
+  const { scene } = useGLTF("/models/porsche.glb");
   const busy = useRef(false);
   const simRef = useRef(null); // physics state, set when running
   const originalPos = useRef({ x: -4.0, y: 0.32, z: -3.5 });
@@ -954,16 +1146,19 @@ function PorscheModel() {
       if (obj.isMesh) {
         obj.castShadow = true;
         obj.receiveShadow = true;
-        const name = obj.name?.toLowerCase() || '';
-        if (name.includes('vehiclelights') || (name.includes('lights') && name.includes('lod0'))) {
+        const name = obj.name?.toLowerCase() || "";
+        if (
+          name.includes("vehiclelights") ||
+          (name.includes("lights") && name.includes("lod0"))
+        ) {
           lights.push(obj);
         }
-        if (name.includes('tyre') || name.includes('ssr')) {
+        if (name.includes("tyre") || name.includes("ssr")) {
           wheels.push(obj);
         }
       }
       // Find the wheel group (parent of wheel meshes)
-      if (obj.isGroup && obj.name?.toLowerCase() === 'wheel') {
+      if (obj.isGroup && obj.name?.toLowerCase() === "wheel") {
         wheelGroupRef.current = obj;
       }
     });
@@ -983,7 +1178,9 @@ function PorscheModel() {
     // 1. Headlights on with glow
     headlightsRef.current.forEach((mesh) => {
       if (mesh.material) {
-        const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+        const mats = Array.isArray(mesh.material)
+          ? mesh.material
+          : [mesh.material];
         mats.forEach((mat) => {
           if (mat && mat.emissive) {
             mat.emissive.setHex(0xffdd44);
@@ -1001,6 +1198,7 @@ function PorscheModel() {
 
     setTimeout(() => {
       playPorscheMove();
+      playDriftScreech();
 
       // Phase 1: Move slightly right, then flick the rear toward the user
       // Phase 2: 360 circle behind the CRT
@@ -1009,7 +1207,8 @@ function PorscheModel() {
       simRef.current = {
         heading: 2.5,
         elapsed: 0,
-        prevX: orig.x, prevZ: orig.z,
+        prevX: orig.x,
+        prevZ: orig.z,
         driftAngle: 0,
       };
       playPorscheMove();
@@ -1025,28 +1224,37 @@ function PorscheModel() {
 
     sim.elapsed += dt;
 
-    const path = [...DRIFT_PATH_POINTS, { x: originalPos.current.x, z: originalPos.current.z }];
+    const path = [
+      { x: originalPos.current.x, z: originalPos.current.z },
+      ...DRIFT_PATH_POINTS,
+      { x: originalPos.current.x, z: originalPos.current.z },
+    ];
     const totalSegs = path.length - 1;
-    const progress = Math.min(sim.elapsed / 9.0, 1.0);
+    const progress = Math.min(sim.elapsed / 6.0, 1.0);
 
     if (progress >= 1.0) {
       simRef.current = null;
-      headlightsRef.current.forEach(m => {
+      headlightsRef.current.forEach((m) => {
         if (m.material) {
-          (Array.isArray(m.material) ? m.material : [m.material]).forEach(mat => {
-            if (mat && mat.emissive) { mat.emissive.setHex(0); mat.emissiveIntensity = 0; }
-          });
+          (Array.isArray(m.material) ? m.material : [m.material]).forEach(
+            (mat) => {
+              if (mat && mat.emissive) {
+                mat.emissive.setHex(0);
+                mat.emissiveIntensity = 0;
+              }
+            },
+          );
         }
       });
       busy.current = false;
       return;
     }
 
-    // Interpolate position along path
+    // Interpolate position along path — linear for fluid motion, no stopping
     const rawIdx = progress * totalSegs;
     const idx = Math.min(Math.floor(rawIdx), totalSegs - 1);
     const frac = rawIdx - idx;
-    const sf = frac * frac * (3 - 2 * frac);
+    const sf = frac;
     const from = path[idx];
     const to = path[idx + 1];
     const px = from.x + (to.x - from.x) * sf;
@@ -1062,9 +1270,10 @@ function PorscheModel() {
     if (vLen > 0.001) {
       const velAngle = Math.atan2(vz, vx);
 
-      // Drift offset per segment — no blending, instant per segment
-      const driftBySeg = [0, 0, 1.0, 3.0, 4.8, 6.2, 4.0, 0.2, 0];
-      const driftOffset = driftBySeg[Math.min(idx + 1, driftBySeg.length - 1)] || 0;
+      // Drift offset — instant per segment (no blend, no spin)
+      const driftBySeg = [0, -1.2, 0.8, 2, 3.5, 5, 7, 1, 0];
+      const rawDrift = driftBySeg[Math.min(idx, driftBySeg.length - 1)] || 0;
+      const driftOffset = rawDrift;
       const osc = Math.sin(frac * Math.PI * 2) * 0.15;
 
       // Heading = velocity direction + 90° for car model + drift offset
@@ -1081,7 +1290,8 @@ function PorscheModel() {
     target.position.x = px;
     target.position.z = pz;
 
-    if (wheelGroupRef.current) wheelGroupRef.current.rotation.y = sim.driftAngle * 0.5;
+    if (wheelGroupRef.current)
+      wheelGroupRef.current.rotation.y = sim.driftAngle * 0.5;
   });
 
   return (
@@ -1091,8 +1301,13 @@ function PorscheModel() {
       rotation={[0, 2.5, 0]}
       scale={[0.5, 0.5, 0.5]}
       onClick={handleClick}
-      onPointerOver={(e) => { e.stopPropagation(); document.body.style.cursor = 'pointer'; }}
-      onPointerOut={() => { document.body.style.cursor = 'auto'; }}
+      onPointerOver={(e) => {
+        e.stopPropagation();
+        document.body.style.cursor = "pointer";
+      }}
+      onPointerOut={() => {
+        document.body.style.cursor = "auto";
+      }}
     >
       <primitive object={scene} />
     </group>
@@ -1112,7 +1327,7 @@ function CameraRig({ isZoomedIn }) {
       gsap.to(cameraRef.current, {
         zoom: 350,
         duration: 1.4,
-        ease: 'power3.inOut',
+        ease: "power3.inOut",
         onUpdate: () => cameraRef.current?.updateProjectionMatrix(),
       });
     } else {
@@ -1120,7 +1335,7 @@ function CameraRig({ isZoomedIn }) {
       gsap.to(cameraRef.current, {
         zoom: 70,
         duration: 1.2,
-        ease: 'power2.out',
+        ease: "power2.out",
         onUpdate: () => cameraRef.current?.updateProjectionMatrix(),
       });
     }
@@ -1159,7 +1374,12 @@ function WaypointMarker({ position, number }) {
     <group position={[position[0], 0.05, position[1]]}>
       <mesh rotation={[-Math.PI / 2, 0, 0]}>
         <planeGeometry args={[0.8, 0.8]} />
-        <meshBasicMaterial color="#00ff88" transparent opacity={0.3} side={THREE.DoubleSide} />
+        <meshBasicMaterial
+          color="#00ff88"
+          transparent
+          opacity={0.3}
+          side={THREE.DoubleSide}
+        />
       </mesh>
       <Text
         position={[0, 0.1, 0]}
@@ -1181,14 +1401,14 @@ function WaypointMarker({ position, number }) {
 
 // ─── Final Drift Path (hardcoded from user's waypoints) ────────────
 const DRIFT_PATH_POINTS = [
-  { x: -5.0, z: 2.0 },    // 1 (was 2)
-  { x: -2.9, z: 8.0 },    // 2 (was 3)
-  { x: 2.1, z: 11.0 },    // 3 (was 4)
-  { x: 7.4, z: 9.0 },     // 4 (was 5)
-  { x: 12.7, z: 2.0 },    // 5 (was 6)
-  { x: 11.7, z: -7.0 },   // 6 (was 7)
-  { x: 5.7, z: -12.0 },   // 7 (was 8)
-  { x: -1.3, z: -11.0 },  // 8 (was 9)
+  { x: -5.0, z: 2.0 }, // 1 (was 2)
+  { x: -2.9, z: 8.0 }, // 2 (was 3)
+  { x: 2.1, z: 11.0 }, // 3 (was 4)
+  { x: 7.4, z: 9.0 }, // 4 (was 5)
+  { x: 12.7, z: 2.0 }, // 5 (was 6)
+  { x: 11.7, z: -7.0 }, // 6 (was 7)
+  { x: 5.7, z: -12.0 }, // 7 (was 8)
+  { x: -1.3, z: -11.0 }, // 8 (was 9)
 ];
 
 // ─── Interactive Waypoint Placer ────────────────────────────────────
@@ -1203,7 +1423,10 @@ function WaypointPlacer({ waypoints, setWaypoints }) {
     for (const hit of intersects) {
       const p = hit.point;
       if (Math.abs(p.y) < 0.5) {
-        setWaypoints(prev => [...prev, { x: Math.round(p.x * 10) / 10, z: Math.round(p.z * 10) / 10 }]);
+        setWaypoints((prev) => [
+          ...prev,
+          { x: Math.round(p.x * 10) / 10, z: Math.round(p.z * 10) / 10 },
+        ]);
         break;
       }
     }
@@ -1211,12 +1434,13 @@ function WaypointPlacer({ waypoints, setWaypoints }) {
 
   useEffect(() => {
     const handleKey = (e) => {
-      if (e.key === 'z' || e.key === 'Z') setWaypoints(prev => prev.slice(0, -1));
-      if (e.key === 'c' || e.key === 'C') setWaypoints([]);
-      if (e.key === 's' || e.key === 'S') setShowCoords(prev => !prev);
+      if (e.key === "z" || e.key === "Z")
+        setWaypoints((prev) => prev.slice(0, -1));
+      if (e.key === "c" || e.key === "C") setWaypoints([]);
+      if (e.key === "s" || e.key === "S") setShowCoords((prev) => !prev);
     };
-    window.addEventListener('keydown', handleKey);
-    return () => window.removeEventListener('keydown', handleKey);
+    window.addEventListener("keydown", handleKey);
+    return () => window.removeEventListener("keydown", handleKey);
   }, [setWaypoints]);
 
   return (
@@ -1225,8 +1449,12 @@ function WaypointPlacer({ waypoints, setWaypoints }) {
         position={[0, -0.02, 0]}
         rotation={[-Math.PI / 2, 0, 0]}
         onClick={handleClick}
-        onPointerOver={() => { document.body.style.cursor = 'crosshair'; }}
-        onPointerOut={() => { document.body.style.cursor = 'auto'; }}
+        onPointerOver={() => {
+          document.body.style.cursor = "crosshair";
+        }}
+        onPointerOut={() => {
+          document.body.style.cursor = "auto";
+        }}
       >
         <planeGeometry args={[40, 40]} />
         <meshBasicMaterial transparent opacity={0} side={THREE.DoubleSide} />
@@ -1253,7 +1481,7 @@ function WaypointPlacer({ waypoints, setWaypoints }) {
           anchorY="top"
           frustumCulled={false}
         >
-          {waypoints.map((wp, i) => `${i + 1}: ${wp.x}, ${wp.z}`).join('\n')}
+          {waypoints.map((wp, i) => `${i + 1}: ${wp.x}, ${wp.z}`).join("\n")}
         </Text>
       )}
     </group>
@@ -1268,7 +1496,12 @@ function ReferenceMarkers() {
         <group key={i} position={[p.x, 0.05, p.z]}>
           <mesh rotation={[-Math.PI / 2, 0, 0]}>
             <planeGeometry args={[0.7, 0.7]} />
-            <meshBasicMaterial color="#00ff88" transparent opacity={0.25} side={THREE.DoubleSide} />
+            <meshBasicMaterial
+              color="#00ff88"
+              transparent
+              opacity={0.25}
+              side={THREE.DoubleSide}
+            />
           </mesh>
           <Text
             position={[0, 0.1, 0]}
@@ -1290,7 +1523,12 @@ function ReferenceMarkers() {
       <group position={[-4.0, 0.05, -3.5]}>
         <mesh rotation={[-Math.PI / 2, 0, 0]}>
           <planeGeometry args={[0.5, 0.5]} />
-          <meshBasicMaterial color="#ff8844" transparent opacity={0.4} side={THREE.DoubleSide} />
+          <meshBasicMaterial
+            color="#ff8844"
+            transparent
+            opacity={0.4}
+            side={THREE.DoubleSide}
+          />
         </mesh>
         <Text
           position={[0, 0.1, 0]}
@@ -1308,52 +1546,116 @@ function ReferenceMarkers() {
   );
 }
 
+// ─── Minecraft Background Music ──────────────────────────────────────
+const MINECRAFT_MUSIC_URL =
+  "https://archive.org/download/08-minecraft_202302/18%20-%20Sweden.mp3";
+
 // ─── Main Export ──────────────────────────────────────────────────────────────
-export default function ComputerScene({ onEnter, isZoomedIn }) {
+export default function ComputerScene({ onEnter, isZoomedIn, onNavigate }) {
+  const [musicMuted, setMusicMuted] = useState(true);
+  const musicRef = useRef(null);
+
+  useEffect(() => {
+    const audio = new Audio(MINECRAFT_MUSIC_URL);
+    audio.loop = true;
+    audio.volume = 0.15;
+    audio.muted = true;
+    musicRef.current = audio;
+    return () => {
+      audio.pause();
+      audio.src = "";
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!musicRef.current) return;
+    if (!musicMuted) {
+      musicRef.current.muted = false;
+      musicRef.current.play().catch(() => {});
+    } else {
+      musicRef.current.pause();
+    }
+  }, [musicMuted]);
   return (
-    <Canvas
-      shadows
-      dpr={[1, 1.5]}
-      gl={{
-        antialias: true,
-        toneMapping: THREE.ACESFilmicToneMapping,
-        toneMappingExposure: 1.2,
-        powerPreference: 'high-performance',
-      }}
-    >
-      <color attach="background" args={['#111114']} />
+    <div style={{ position: "relative", width: "100%", height: "100%" }}>
+      <Canvas
+        shadows
+        dpr={[1, 1.5]}
+        gl={{
+          antialias: true,
+          toneMapping: THREE.ACESFilmicToneMapping,
+          toneMappingExposure: 1.2,
+          powerPreference: "high-performance",
+        }}
+      >
+        <color attach="background" args={["#111114"]} />
 
-      <ambientLight intensity={0.9} />
-      <directionalLight
-        position={[10, 15, 10]}
-        intensity={1.8}
-        castShadow
-        shadow-mapSize={[512, 512]}
-        shadow-bias={-0.0001}
-      />
-      <directionalLight position={[-8, 10, -5]} intensity={0.5} color="#88b5ff" />
-      <pointLight position={[0, 5, 0]} intensity={0.4} color="#ffffff" />
+        <ambientLight intensity={0.9} />
+        <directionalLight
+          position={[10, 15, 10]}
+          intensity={1.8}
+          castShadow
+          shadow-mapSize={[512, 512]}
+          shadow-bias={-0.0001}
+        />
+        <directionalLight
+          position={[-8, 10, -5]}
+          intensity={0.5}
+          color="#88b5ff"
+        />
+        <pointLight position={[0, 5, 0]} intensity={0.4} color="#ffffff" />
 
-      <GridFloor />
+        <GridFloor />
 
-      <Suspense fallback={null}>
-        <MainModel onEnter={onEnter} />
-      </Suspense>
+        <Suspense fallback={null}>
+          <MainModel onEnter={onEnter} />
+        </Suspense>
 
-      <FloorLabels />
+        <FloorLabels onNavigate={onNavigate} />
 
-      <ReferenceMarkers />
+        <Suspense fallback={null}>
+          <CatModel />
+        </Suspense>
+        <Suspense fallback={null}>
+          <PorscheModel />
+        </Suspense>
 
-      <Suspense fallback={null}>
-        <CatModel />
-      </Suspense>
-      <Suspense fallback={null}>
-        <PorscheModel />
-      </Suspense>
+        <HoverHint
+          position={[4.57, 0.1, -0.3]}
+          text="🐱 pet the cat 🐱"
+          floatHeight={1.5}
+        />
+        <HoverHint position={[-4.0, 0.5, -3.5]} text="Drift?" />
 
-      <HoverHint position={[4.57, 0.5, -0.30]} text="🐱 pet the cat 🐱" />
+        <CameraRig isZoomedIn={isZoomedIn} />
+      </Canvas>
 
-      <CameraRig isZoomedIn={isZoomedIn} />
-    </Canvas>
+      {/* ── Music mute button ── */}
+      <button
+        onClick={() => setMusicMuted((prev) => !prev)}
+        style={{
+          position: "absolute",
+          bottom: 16,
+          right: 16,
+          width: 40,
+          height: 40,
+          background: "rgba(0,0,0,0.6)",
+          border: "1px solid #333",
+          borderRadius: 8,
+          color: "#facc15",
+          fontSize: 20,
+          cursor: "pointer",
+          zIndex: 999,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          backdropFilter: "blur(4px)",
+          opacity: 0.7,
+        }}
+        title={musicMuted ? "Unmute music" : "Mute music"}
+      >
+        {musicMuted ? "🔇" : "🎵"}
+      </button>
+    </div>
   );
 }
