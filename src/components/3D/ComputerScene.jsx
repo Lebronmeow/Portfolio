@@ -1047,7 +1047,7 @@ function PorscheModel() {
     if (sim.phase === 2 && d4 < 5.0) sim.phase = 3;
     if (sim.phase === 3 && ds < 6.0) sim.phase = 4;
 
-    const P = { MS: 10, ACC: 5, DEC: 0.997, SD: 0.12, YR: 15, YD: 0.92, YI: 0.90, GD: 0.25 };
+    const P = { MS: 10, ACC: 5, DEC: 0.997, SD: 0.15, YR: 3.0, YD: 0.96, YI: 0.95, GD: 0.25 };
 
     // Phase logic
     if (sim.phase === 0) {
@@ -1090,10 +1090,11 @@ function PorscheModel() {
     // Physics step
     sim.steerAngle += (sim.targetSteer - sim.steerAngle) * P.SD;
     sim.speed = Math.min(sim.speed + P.ACC * sim.throttle * dt, P.MS) * P.DEC;
-    const yawT = sim.steerAngle * P.YR * (sim.speed / P.MS);
-    sim.yawVelocity = sim.yawVelocity * P.YD + yawT * dt * (1 - P.YD);
-    sim.yawVelocity *= P.YI;
-    sim.heading += sim.yawVelocity * dt;
+    // Yaw: steering creates rotation with inertia
+    const yawInput = sim.steerAngle * 4.0;   // torque (rad/s²)
+    sim.yawVelocity = sim.yawVelocity * 0.96 + yawInput * dt; // integrate
+    sim.yawVelocity *= 0.97;                  // friction
+    sim.heading += sim.yawVelocity * dt;       // update heading
 
     const fx = -Math.sin(sim.heading), fz = -Math.cos(sim.heading);
     const lx = -Math.cos(sim.heading), lz = Math.sin(sim.heading);
