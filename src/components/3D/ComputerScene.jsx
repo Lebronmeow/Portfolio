@@ -1056,10 +1056,10 @@ function PorscheModel() {
       const MAX_SPEED = 10.0;
       const ACCEL = 5.0;
       const DECEL = 0.997;
-      const STEER_DAMP = 0.08;    // steering smoothing
+      const STEER_DAMP = 0.12;    // steering smoothing
       const YAW_INERTIA = 0.90;   // how much yaw persists
-      const YAW_RESPONSE = 8.0;   // steering → yaw torque
-      const YAW_DAMP = 0.94;      // yaw friction
+      const YAW_RESPONSE = 15.0;  // steering → yaw torque
+      const YAW_DAMP = 0.92;      // yaw friction
       const GRIP_DRIFT = 0.25;    // rear grip during full drift
       const GRIP_RECOVER = 0.015; // grip recovery rate
 
@@ -1098,7 +1098,7 @@ function PorscheModel() {
           let desiredSteer = 0;
           if (sim.phase === 0) {
             // Normal drive: gentle steer, full grip
-            desiredSteer = Math.max(-0.5, Math.min(0.5, angleToTarget * 0.5));
+            desiredSteer = Math.max(-0.8, Math.min(0.8, angleToTarget * 0.8));
             sim.throttle = 1.0;
             sim.rearGrip = 1.0;
           } else if (sim.phase === 1) {
@@ -1125,7 +1125,7 @@ function PorscheModel() {
             sim.rearGrip = Math.min(1.0, sim.rearGrip + GRIP_RECOVER * 2);
           } else {
             // Return to start: normal driving
-            desiredSteer = Math.max(-0.5, Math.min(0.5, angleToTarget * 0.4));
+            desiredSteer = Math.max(-0.8, Math.min(0.8, angleToTarget * 0.6));
             sim.throttle = 0.5;
             sim.rearGrip = Math.min(1.0, sim.rearGrip + GRIP_RECOVER * 3);
           }
@@ -1172,6 +1172,11 @@ function PorscheModel() {
           target.position.x = sim.x;
           target.position.z = sim.z;
           target.rotation.y = sim.heading;
+
+          // 12. Front wheel steering visual
+          if (wheelGroupRef.current) {
+            wheelGroupRef.current.rotation.y = sim.steerAngle * 0.5;
+          }
         },
       }, 0.5);
     }, ENGINE_START_DELAY);
