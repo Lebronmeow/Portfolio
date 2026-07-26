@@ -996,26 +996,26 @@ function PorscheModel() {
     setTimeout(() => {
       playPorscheMove();
 
-      // Path: 360 circle behind the desk (behind flowers and CRT)
-      const CIRCLE_CENTER = { x: -0.5, z: -4.0 };
-      const RADIUS = 4.0;
-      const DRIFT_TIME = 6;
-      const DRIFT_ANGLE = 0.4;
+      // Phase 1: Move slightly right, then flick the rear toward the user
+      // Phase 2: 360 circle behind the CRT
+      // Phase 3: Return to start and park
 
-      // Calculate angle of start position relative to circle center
-      const dx = orig.x - CIRCLE_CENTER.x;
-      const dz = orig.z - CIRCLE_CENTER.z;
-      const startAngle = Math.atan2(dz, dx);
+      const PHASE1_TIME = 1.0;
+      const PHASE2_TIME = 5.5;
+      const PHASE3_TIME = 1.0;
 
-      // Move to circle path first
-      const entryX = CIRCLE_CENTER.x + Math.cos(startAngle) * RADIUS;
-      const entryZ = CIRCLE_CENTER.z + Math.sin(startAngle) * RADIUS;
+      // The rear kick-out point (where the car's rear faces the user)
+      const kickX = orig.x + 1.5;
+      const kickZ = orig.z + 1.0;
 
-      const driftState = { angle: startAngle };
+      // Circle behind the desk
+      const CIRCLE_CENTER = { x: -1.0, z: -4.5 };
+      const RADIUS = 3.5;
+
+      const driftState = { angle: 0 };
 
       const tl = gsap.timeline({
         onComplete: () => {
-          // Turn off headlights
           headlightsRef.current.forEach((mesh) => {
             if (mesh.material) {
               const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
@@ -1031,54 +1031,57 @@ function PorscheModel() {
         },
       });
 
-      // Move to circle entry point
+      // Phase 1: Move right and flick the rear
+      // Car moves forward-right while rotating sharply (rear swings out)
       tl.to(target.position, {
-        x: entryX,
-        z: entryZ,
-        duration: 0.4,
+        x: kickX,
+        z: kickZ,
+        duration: PHASE1_TIME,
         ease: 'power2.out',
       }, 0)
       .to(target.rotation, {
-        y: startAngle - Math.PI / 2,
-        duration: 0.3,
+        y: 0.8, // Rotate so rear faces toward user
+        duration: PHASE1_TIME * 0.7,
         ease: 'power2.out',
       }, 0);
 
-      // 360 circle drift behind the desk
+      // Phase 2: 360 circle behind the desk
+      // The car is now facing roughly toward the circle, begin the drift
+      const circleStartAngle = Math.atan2(kickZ - CIRCLE_CENTER.z, kickX - CIRCLE_CENTER.x);
+
+      // Smoothly transition into the circle
       tl.to(driftState, {
-        angle: startAngle + Math.PI * 2,
-        duration: DRIFT_TIME,
+        angle: circleStartAngle + Math.PI * 2,
+        duration: PHASE2_TIME,
         ease: 'none',
         onUpdate: () => {
           const a = driftState.angle;
-          // Position on circle
           target.position.x = CIRCLE_CENTER.x + Math.cos(a) * RADIUS;
           target.position.z = CIRCLE_CENTER.z + Math.sin(a) * RADIUS;
-          // Face direction of travel (tangent to circle) + drift angle
-          // For a rear-wheel-drive drift, the car's rear slides out
-          // so the car body faces slightly INTO the turn
-          const tangent = a - Math.PI / 2;
-          target.rotation.y = tangent - DRIFT_ANGLE;
 
-          // Rotate all wheels
+          // Face tangent to circle + drift angle (rear slides out)
+          const tangent = a + Math.PI / 2;
+          target.rotation.y = tangent + 0.35;
+
+          // Spin wheels on the correct axis
           wheelsRef.current.forEach((wheel) => {
-            wheel.rotation.x += 0.15;
+            wheel.rotation.z += 0.2;
           });
         },
-      }, 0.4);
+      }, PHASE1_TIME);
 
-      // Return to original position
+      // Phase 3: Return to start and park
       tl.to(target.position, {
         x: orig.x,
         z: orig.z,
-        duration: 0.6,
+        duration: PHASE3_TIME,
         ease: 'power2.inOut',
-      }, DRIFT_TIME + 0.6)
+      }, PHASE1_TIME + PHASE2_TIME)
       .to(target.rotation, {
         y: originalRot.current,
-        duration: 0.4,
+        duration: PHASE3_TIME * 0.6,
         ease: 'power2.out',
-      }, DRIFT_TIME + 0.6);
+      }, PHASE1_TIME + PHASE2_TIME);
     }, ENGINE_START_DELAY);
   };
 
