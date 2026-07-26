@@ -1030,21 +1030,8 @@ function PorscheModel() {
         },
       });
 
-      // ─── Fixed Drift Path ─────────────────────────────────────────────
-      // Hardcoded path based on the drift pattern:
-      // Start → forward → left → front of keyboard → right side → behind → return
-      const path = [
-        { x: -4.0, z: -3.5 },  // 0: Start
-        { x: -4.0, z: -2.0 },  // 1: Forward
-        { x: -5.5, z: 0.0 },   // 2: Left
-        { x: -3.0, z: 3.0 },   // 3: Front-left
-        { x: 0.0, z: 4.5 },    // 4: Front-center
-        { x: 3.5, z: 3.5 },    // 5: Front-right
-        { x: 5.0, z: 0.5 },    // 6: Right side
-        { x: 3.0, z: -2.5 },   // 7: Back-right
-        { x: 0.0, z: -4.5 },   // 8: Behind
-        { x: -4.0, z: -3.5 },  // 9: Return to start
-      ];
+      // ─── Fixed Drift Path (matches floor reference markers) ───────────
+      const path = DRIFT_PATH_POINTS;
 
       // Drift offset per segment: 0=none, 0.5=moderate, 1.0=full drift
       const driftPerSegment = [0, 0, 0.6, 0.8, 0.5, 0.3, 0.4, 0.5, 0.2, 0];
@@ -1178,6 +1165,49 @@ function CameraRig({ isZoomedIn }) {
   );
 }
 
+// ─── Reference Waypoints (numbered markers on the floor) ─────────────
+const DRIFT_PATH_POINTS = [
+  { x: -4.0, z: -3.5 },  // 1: Start
+  { x: -4.0, z: -2.0 },  // 2: Forward
+  { x: -5.5, z: 0.0 },   // 3: Left
+  { x: -3.0, z: 3.0 },   // 4: Front-left
+  { x: 0.0, z: 4.5 },    // 5: Front-center
+  { x: 3.5, z: 3.5 },    // 6: Front-right
+  { x: 5.0, z: 0.5 },    // 7: Right side
+  { x: 3.0, z: -2.5 },   // 8: Back-right
+  { x: 0.0, z: -4.5 },   // 9: Behind
+  { x: -4.0, z: -3.5 },  // 10: Return
+];
+
+function ReferenceMarkers() {
+  return (
+    <group>
+      {DRIFT_PATH_POINTS.map((p, i) => (
+        <group key={i} position={[p.x, 0.05, p.z]}>
+          <mesh rotation={[-Math.PI / 2, 0, 0]}>
+            <planeGeometry args={[0.8, 0.8]} />
+            <meshBasicMaterial color="#00ff88" transparent opacity={0.2} side={THREE.DoubleSide} />
+          </mesh>
+          <Text
+            position={[0, 0.1, 0]}
+            fontSize={0.35}
+            color="#00ff88"
+            anchorX="center"
+            anchorY="middle"
+            rotation={[-Math.PI / 2, 0, 0]}
+            outlineWidth={0.05}
+            outlineColor="#000"
+            outlineOpacity={0.8}
+            frustumCulled={false}
+          >
+            {String(i + 1)}
+          </Text>
+        </group>
+      ))}
+    </group>
+  );
+}
+
 // ─── Main Export ──────────────────────────────────────────────────────────────
 export default function ComputerScene({ onEnter, isZoomedIn }) {
   return (
@@ -1211,6 +1241,9 @@ export default function ComputerScene({ onEnter, isZoomedIn }) {
       </Suspense>
 
       <FloorLabels />
+
+      {/* Reference markers — numbered path points on the floor */}
+      <ReferenceMarkers />
 
       <Suspense fallback={null}>
         <CatModel />
