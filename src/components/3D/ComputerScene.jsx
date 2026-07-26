@@ -934,7 +934,7 @@ function playPorscheMove() {
 }
 
 // ─── Porsche Model with click-to-drift animation ───────────────────────
-function PorscheModel({ waypoints }) {
+function PorscheModel() {
   const groupRef = useRef();
   const { scene } = useGLTF('/models/porsche.glb');
   const busy = useRef(false);
@@ -1030,38 +1030,34 @@ function PorscheModel({ waypoints }) {
         },
       });
 
-      // ─── Waypoint Path with Drift Physics (hybrid) ─────────────────────
-      if (!waypoints || waypoints.length < 2) {
-        busy.current = false;
-        return;
-      }
+      // ─── Fixed Drift Path ─────────────────────────────────────────────
+      // Hardcoded path based on the drift pattern:
+      // Start → forward → left → front of keyboard → right side → behind → return
+      const path = [
+        { x: -4.0, z: -3.5 },  // 0: Start
+        { x: -4.0, z: -2.0 },  // 1: Forward
+        { x: -5.5, z: 0.0 },   // 2: Left
+        { x: -3.0, z: 3.0 },   // 3: Front-left
+        { x: 0.0, z: 4.5 },    // 4: Front-center
+        { x: 3.5, z: 3.5 },    // 5: Front-right
+        { x: 5.0, z: 0.5 },    // 6: Right side
+        { x: 3.0, z: -2.5 },   // 7: Back-right
+        { x: 0.0, z: -4.5 },   // 8: Behind
+        { x: -4.0, z: -3.5 },  // 9: Return to start
+      ];
 
-      // Build path: start → forward → waypoints → return to start
-      const wpStart = waypoints[0];
-      const forwardPt = { x: wpStart.x, z: wpStart.z + 1.8 };
-      const path = [wpStart, forwardPt, ...waypoints.slice(1), { x: orig.x, z: orig.z }];
+      // Drift offset per segment: 0=none, 0.5=moderate, 1.0=full drift
+      const driftPerSegment = [0, 0, 0.6, 0.8, 0.5, 0.3, 0.4, 0.5, 0.2, 0];
 
-      // Calculate total path length for duration
       const totalDist = path.reduce((acc, wp, i) => {
         if (i === 0) return 0;
         return acc + Math.sqrt((wp.x - path[i-1].x)**2 + (wp.z - path[i-1].z)**2);
       }, 0);
 
-      // Drift settings per segment (index in path)
-      // phase: 0=normal, 1=initiate, 2=hold, 3=recover
-      const segmentSettings = path.map((_, i) => {
-        if (i === 0 || i === 1) return { phase: 0, drift: 0 };
-        if (i === 2) return { phase: 1, drift: 0.6 };  // initiate at waypoint 2
-        if (i === 3) return { phase: 2, drift: 0.8 };  // hold drift
-        if (i === 4) return { phase: 2, drift: 0.4 };  // hold, reducing
-        return { phase: 3, drift: 0.1 };                // recover
-      });
-
       const state = {
         progress: 0,
         heading: 2.5,
         driftOffset: 0,
-        steerAngle: 0,
         prevX: orig.x,
         prevZ: orig.z,
       };
@@ -1083,40 +1079,24 @@ function PorscheModel({ waypoints }) {
           const newX = from.x + (to.x - from.x) * smoothFrac;
           const newZ = from.z + (to.z - from.z) * smoothFrac;
 
-          // Velocity direction (where the car is actually moving)
           const vx = newX - state.prevX;
           const vz = newZ - state.prevZ;
           const vLen = Math.sqrt(vx * vx + vz * vz);
 
           if (vLen > 0.001) {
             const velAngle = Math.atan2(vz, vx);
-
-            // Target heading = direction of travel + 90° offset (car model faces -Z)
             const targetHeading = velAngle + Math.PI / 2;
 
-            // Get settings for this segment
-            const seg = segmentSettings[Math.min(idx + 1, segmentSettings.length - 1)];
-
-            // Calculate drift offset based on segment
-            let targetDrift = seg.drift;
-            if (seg.phase === 1) {
-              // Initiate: quick drift onset
-              targetDrift = 0.6 + Math.sin(frac * Math.PI) * 0.3;
-            } else if (seg.phase === 2) {
-              // Hold: steady drift with slight oscillation
-              targetDrift = 0.5 + Math.sin(frac * Math.PI * 2) * 0.2;
-            }
-
-            // Smoothly blend drift offset
+            // Blend drift offset toward segment target
+            const targetDrift = driftPerSegment[Math.min(idx + 1, driftPerSegment.length - 1)];
             state.driftOffset += (targetDrift - state.driftOffset) * 0.12;
 
-            // Smoothly steer heading toward target with lag
+            // Steer heading toward travel direction with lag
             let headingDiff = targetHeading - state.heading;
             if (headingDiff > Math.PI) headingDiff -= Math.PI * 2;
             if (headingDiff < -Math.PI) headingDiff += Math.PI * 2;
             state.heading += headingDiff * 0.15;
 
-            // Apply heading + drift offset for rotation
             target.rotation.y = state.heading + state.driftOffset;
           }
 
@@ -1198,94 +1178,8 @@ function CameraRig({ isZoomedIn }) {
   );
 }
 
-// ─── Waypoint Marker ────────────────────────────────────────────────────
-function WaypointMarker({ position, number }) {
-  return (
-    <group position={[position[0], 0.05, position[1]]}>
-      <mesh rotation={[-Math.PI / 2, 0, 0]}>
-        <planeGeometry args={[0.8, 0.8]} />
-        <meshBasicMaterial color="#00ff88" transparent opacity={0.3} side={THREE.DoubleSide} />
-      </mesh>
-      <Text
-        position={[0, 0.1, 0]}
-        fontSize={0.35}
-        color="#00ff88"
-        anchorX="center"
-        anchorY="middle"
-        rotation={[-Math.PI / 2, 0, 0]}
-        outlineWidth={0.05}
-        outlineColor="#000"
-        outlineOpacity={0.8}
-        frustumCulled={false}
-      >
-        {String(number)}
-      </Text>
-    </group>
-  );
-}
-
-// ─── Interactive Waypoint Placer ──────────────────────────────────────
-function WaypointPlacer({ waypoints, setWaypoints }) {
-  const { raycaster, pointer, camera, scene } = useThree();
-
-  const handleClick = (e) => {
-    e.stopPropagation();
-    raycaster.setFromCamera(pointer, camera);
-    const intersects = raycaster.intersectObjects(scene.children, true);
-    for (const hit of intersects) {
-      const p = hit.point;
-      if (Math.abs(p.y) < 0.5) {
-        setWaypoints(prev => [...prev, { x: Math.round(p.x * 10) / 10, z: Math.round(p.z * 10) / 10 }]);
-        break;
-      }
-    }
-  };
-
-  // Listen for C key to clear, Escape to finish
-  useEffect(() => {
-    const handleKey = (e) => {
-      if (e.key === 'c' || e.key === 'C') setWaypoints([]);
-      if (e.key === 'z' || e.key === 'Z') setWaypoints(prev => prev.slice(0, -1));
-    };
-    window.addEventListener('keydown', handleKey);
-    return () => window.removeEventListener('keydown', handleKey);
-  }, [setWaypoints]);
-
-  return (
-    <group>
-      <mesh
-        position={[0, -0.02, 0]}
-        rotation={[-Math.PI / 2, 0, 0]}
-        onClick={handleClick}
-        onPointerOver={() => { document.body.style.cursor = 'crosshair'; }}
-        onPointerOut={() => { document.body.style.cursor = 'auto'; }}
-      >
-        <planeGeometry args={[40, 40]} />
-        <meshBasicMaterial transparent opacity={0} side={THREE.DoubleSide} />
-      </mesh>
-
-      {waypoints.map((wp, i) => (
-        <WaypointMarker key={i} position={[wp.x, wp.z]} number={i + 1} />
-      ))}
-
-      <Text
-        position={[0, 4.5, 0]}
-        fontSize={0.3}
-        color="#00ff88"
-        anchorX="center"
-        anchorY="middle"
-        frustumCulled={false}
-      >
-        {`Click floor to place waypoints (${waypoints.length}) — Z undo  |  C clear`}
-      </Text>
-    </group>
-  );
-}
-
 // ─── Main Export ──────────────────────────────────────────────────────────────
 export default function ComputerScene({ onEnter, isZoomedIn }) {
-  const [waypoints, setWaypoints] = useState([]);
-
   return (
     <Canvas
       shadows
@@ -1299,7 +1193,6 @@ export default function ComputerScene({ onEnter, isZoomedIn }) {
     >
       <color attach="background" args={['#111114']} />
 
-      {/* Core scene */}
       <ambientLight intensity={0.9} />
       <directionalLight
         position={[10, 15, 10]}
@@ -1319,14 +1212,11 @@ export default function ComputerScene({ onEnter, isZoomedIn }) {
 
       <FloorLabels />
 
-      {/* Click floor to place waypoints */}
-      <WaypointPlacer waypoints={waypoints} setWaypoints={setWaypoints} />
-
       <Suspense fallback={null}>
         <CatModel />
       </Suspense>
       <Suspense fallback={null}>
-        <PorscheModel waypoints={waypoints} />
+        <PorscheModel />
       </Suspense>
 
       <HoverHint position={[4.57, 0.5, -0.30]} text="🐱 pet the cat 🐱" />
