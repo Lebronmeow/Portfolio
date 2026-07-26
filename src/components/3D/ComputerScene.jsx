@@ -267,6 +267,7 @@ function MainModel({ onEnter }) {
                   mLower.includes('polaroid') ||
                   mLower === 'tape' ||
                   mLower.includes('shadow')
+                ) {
                   obj.visible = false;
                   obj.scale.set(0, 0, 0);
                   obj.position.set(0, -100, 0);
