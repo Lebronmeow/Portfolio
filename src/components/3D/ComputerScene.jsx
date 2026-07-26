@@ -938,6 +938,7 @@ function PorscheModel() {
   const groupRef = useRef();
   const { scene } = useGLTF('/models/porsche.glb');
   const busy = useRef(false);
+  const simRef = useRef(null); // physics state, set when running
   const originalPos = useRef({ x: -4.0, y: 0.32, z: -3.5 });
   const originalRot = useRef(2.5);
   const headlightsRef = useRef([]);
@@ -1033,161 +1034,106 @@ function PorscheModel() {
       const wp4 = DRIFT_PATH_POINTS[3];
       let lastTime = 0;
 
-      gsap.to(sim, {
-        elapsed: 14.0,
-        duration: 14.0,
-        ease: 'none',
-        onUpdate: () => {
-          const dt = sim.elapsed - lastTime;
-          lastTime = sim.elapsed;
-          if (dt <= 0) return;
-
-          // ── Phase transitions based on position ──
-          const distToWp2 = Math.sqrt((sim.x - wp2.x)**2 + (sim.z - wp2.z)**2);
-          const distToWp4 = Math.sqrt((sim.x - wp4.x)**2 + (sim.z - wp4.z)**2);
-          const distToStart = Math.sqrt((sim.x - orig.x)**2 + (sim.z - orig.z)**2);
-
-          if (sim.phase === 0 && distToWp2 < 4.0) {
-            sim.phase = 1; // Near waypoint 2 → initiate drift
-            sim.initTimer = 0;
-          }
-          if (sim.phase === 2 && distToWp4 < 5.0) {
-            sim.phase = 3; // Near waypoint 4 → recover
-          }
-          if (sim.phase === 3 && distToStart < 6.0) {
-            sim.phase = 4; // Near start → final approach
-          }
-
-          // ── Phase 0: Normal drive toward waypoint 2 ──
-          if (sim.phase === 0) {
-            const dx = wp2.x - sim.x;
-            const dz = wp2.z - sim.z;
-            const targetAngle = Math.atan2(dz, dx);
-            const facingAngle = Math.atan2(-Math.cos(sim.heading), -Math.sin(sim.heading));
-            let err = ((targetAngle - facingAngle) + Math.PI * 3) % (Math.PI * 2) - Math.PI;
-            sim.targetSteer = Math.max(-0.6, Math.min(0.6, err * 0.6));
-            sim.throttle = 1.0;
-            sim.rearGrip = 1.0;
-          }
-
-          // ── Phase 1: Initiate drift ──
-          else if (sim.phase === 1) {
-            sim.initTimer += dt;
-            // Sharp steering flick, then release
-            const flick = Math.max(0, 1 - sim.initTimer / 0.5);
-            sim.targetSteer = 1.0 * flick;
-            sim.throttle = 1.0;
-            // Rear grip drops rapidly
-            sim.rearGrip = Math.max(GRIP_DRIFT, 1.0 - sim.initTimer * 1.8);
-            if (sim.initTimer > 0.7) {
-              sim.phase = 2;
-              sim.driftTimer = 0;
-            }
-          }
-
-          // ── Phase 2: Hold drift — NO WAYPOINT TARGETING ──
-          else if (sim.phase === 2) {
-            sim.driftTimer += dt;
-            // Countersteer based on slip angle only
-            const velAngle = Math.atan2(sim.vz, sim.vx);
-            const headingAngle = Math.atan2(-Math.cos(sim.heading), -Math.sin(sim.heading));
-            let slipAngle = ((headingAngle - velAngle) + Math.PI * 3) % (Math.PI * 2) - Math.PI;
-            // Countersteer into the slide
-            sim.targetSteer = -slipAngle * 0.35;
-            sim.throttle = 0.7;
-            // Keep rear grip low
-            sim.rearGrip = Math.max(GRIP_DRIFT, sim.rearGrip - 0.003);
-          }
-
-          // ── Phase 3: Recovery ──
-          else if (sim.phase === 3) {
-            const velAngle = Math.atan2(sim.vz, sim.vx);
-            const headingAngle = Math.atan2(-Math.cos(sim.heading), -Math.sin(sim.heading));
-            let slipAngle = ((headingAngle - velAngle) + Math.PI * 3) % (Math.PI * 2) - Math.PI;
-            // Gradually reduce countersteer
-            sim.targetSteer = -slipAngle * 0.12;
-            sim.throttle = 0.4;
-            // Restore grip
-            sim.rearGrip = Math.min(1.0, sim.rearGrip + 0.02);
-          }
-
-          // ── Phase 4: Return to start ──
-          else {
-            const dx = orig.x - sim.x;
-            const dz = orig.z - sim.z;
-            const targetAngle = Math.atan2(dz, dx);
-            const facingAngle = Math.atan2(-Math.cos(sim.heading), -Math.sin(sim.heading));
-            let err = ((targetAngle - facingAngle) + Math.PI * 3) % (Math.PI * 2) - Math.PI;
-            sim.targetSteer = Math.max(-0.5, Math.min(0.5, err * 0.4));
-            sim.throttle = 0.5;
-            sim.rearGrip = Math.min(1.0, sim.rearGrip + 0.03);
-          }
-
-          // 5. Smooth steering
-          sim.targetSteer = desiredSteer;
-          sim.steerAngle += (sim.targetSteer - sim.steerAngle) * STEER_DAMP;
-
-          // 6. Throttle → speed
-          sim.speed = Math.min(sim.speed + ACCEL * sim.throttle * dt, MAX_SPEED);
-          sim.speed *= DECEL;
-
-          // 7. Yaw: steering torque × speed → yaw velocity
-          const yawTorque = sim.steerAngle * YAW_RESPONSE * (sim.speed / MAX_SPEED);
-          sim.yawVelocity = sim.yawVelocity * YAW_DAMP + yawTorque * dt * (1 - YAW_DAMP);
-          // Angular damping (friction)
-          sim.yawVelocity *= YAW_INERTIA;
-
-          // 8. Heading from yaw
-          sim.heading += sim.yawVelocity * dt;
-
-          // 9. Velocity: forward + lateral slip
-          const fwdX = -Math.sin(sim.heading);
-          const fwdZ = -Math.cos(sim.heading);
-          const latX = -Math.cos(sim.heading);
-          const latZ = Math.sin(sim.heading);
-
-          // Forward velocity
-          const fwdVel = sim.speed;
-
-          // Lateral slip from rear grip loss
-          const slipFactor = Math.max(0, 1 - sim.rearGrip * 1.2);
-          const lateralSlip = sim.steerAngle * slipFactor * 0.8;
-
-          // Velocity = forward + lateral
-          sim.vx = fwdX * fwdVel + latX * lateralSlip * fwdVel;
-          sim.vz = fwdZ * fwdVel + latZ * lateralSlip * fwdVel;
-
-          // 10. Position from velocity
-          sim.x += sim.vx * dt;
-          sim.z += sim.vz * dt;
-
-          // 11. Apply to Three.js
-          target.position.x = sim.x;
-          target.position.z = sim.z;
-          target.rotation.y = sim.heading;
-
-          // 12. Front wheel steering visual
-          if (wheelGroupRef.current) {
-            wheelGroupRef.current.rotation.y = sim.steerAngle * 0.5;
-          }
-        },
-        onComplete: () => {
-          headlightsRef.current.forEach((mesh) => {
-            if (mesh.material) {
-              const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
-              mats.forEach((mat) => {
-                if (mat && mat.emissive) {
-                  mat.emissive.setHex(0x000000);
-                  mat.emissiveIntensity = 0;
-                }
-              });
-            }
-          });
-          busy.current = false;
-        },
-      });
-    }, ENGINE_START_DELAY);
+      // Physics runs via useFrame — just play sounds
+      playPorscheMove();
+    }, 1500);
   };
+
+  // ─── Physics simulation running every frame via useFrame ────────
+  useFrame((_, delta) => {
+    const sim = simRef.current;
+    if (!sim || !groupRef.current) return;
+    const target = groupRef.current;
+    const dt = Math.min(delta, 0.05);
+
+    sim.elapsed += dt;
+
+    // Phase transitions by distance
+    const wp2 = DRIFT_PATH_POINTS[1];
+    const wp4 = DRIFT_PATH_POINTS[3];
+    const d2 = Math.sqrt((sim.x - wp2.x)**2 + (sim.z - wp2.z)**2);
+    const d4 = Math.sqrt((sim.x - wp4.x)**2 + (sim.z - wp4.z)**2);
+    const ds = Math.sqrt((sim.x - originalPos.current.x)**2 + (sim.z - originalPos.current.z)**2);
+
+    if (sim.phase === 0 && d2 < 4.0) { sim.phase = 1; sim.initTimer = 0; }
+    if (sim.phase === 2 && d4 < 5.0) sim.phase = 3;
+    if (sim.phase === 3 && ds < 6.0) sim.phase = 4;
+
+    const P = { MS: 10, ACC: 5, DEC: 0.997, SD: 0.12, YR: 15, YD: 0.92, YI: 0.90, GD: 0.25 };
+
+    // Phase logic
+    if (sim.phase === 0) {
+      const a = Math.atan2(wp2.z - sim.z, wp2.x - sim.x);
+      const f = Math.atan2(-Math.cos(sim.heading), -Math.sin(sim.heading));
+      let e = ((a - f) + 6.28) % 6.28 - 3.14;
+      sim.targetSteer = Math.max(-0.6, Math.min(0.6, e * 0.6));
+      sim.throttle = 1; sim.rearGrip = 1;
+    } else if (sim.phase === 1) {
+      sim.initTimer += dt;
+      const f = Math.max(0, 1 - sim.initTimer / 0.5);
+      sim.targetSteer = 1.0 * f;
+      sim.throttle = 1;
+      sim.rearGrip = Math.max(P.GD, 1 - sim.initTimer * 1.8);
+      if (sim.initTimer > 0.7) { sim.phase = 2; sim.driftTimer = 0; }
+    } else if (sim.phase === 2) {
+      sim.driftTimer += dt;
+      const va = Math.atan2(sim.vz, sim.vx);
+      const ha = Math.atan2(-Math.cos(sim.heading), -Math.sin(sim.heading));
+      let sa = ((ha - va) + 6.28) % 6.28 - 3.14;
+      sim.targetSteer = -sa * 0.35;
+      sim.throttle = 0.7;
+      sim.rearGrip = Math.max(P.GD, sim.rearGrip - 0.003);
+    } else if (sim.phase === 3) {
+      const va = Math.atan2(sim.vz, sim.vx);
+      const ha = Math.atan2(-Math.cos(sim.heading), -Math.sin(sim.heading));
+      let sa = ((ha - va) + 6.28) % 6.28 - 3.14;
+      sim.targetSteer = -sa * 0.12;
+      sim.throttle = 0.4;
+      sim.rearGrip = Math.min(1, sim.rearGrip + 0.02);
+    } else {
+      const a = Math.atan2(originalPos.current.z - sim.z, originalPos.current.x - sim.x);
+      const f = Math.atan2(-Math.cos(sim.heading), -Math.sin(sim.heading));
+      let e = ((a - f) + 6.28) % 6.28 - 3.14;
+      sim.targetSteer = Math.max(-0.5, Math.min(0.5, e * 0.4));
+      sim.throttle = 0.5;
+      sim.rearGrip = Math.min(1, sim.rearGrip + 0.03);
+    }
+
+    // Physics step
+    sim.steerAngle += (sim.targetSteer - sim.steerAngle) * P.SD;
+    sim.speed = Math.min(sim.speed + P.ACC * sim.throttle * dt, P.MS) * P.DEC;
+    const yawT = sim.steerAngle * P.YR * (sim.speed / P.MS);
+    sim.yawVelocity = sim.yawVelocity * P.YD + yawT * dt * (1 - P.YD);
+    sim.yawVelocity *= P.YI;
+    sim.heading += sim.yawVelocity * dt;
+
+    const fx = -Math.sin(sim.heading), fz = -Math.cos(sim.heading);
+    const lx = -Math.cos(sim.heading), lz = Math.sin(sim.heading);
+    const sf = Math.max(0, 1 - sim.rearGrip * 1.2);
+    const ls = sim.steerAngle * sf * 0.8;
+    sim.vx = fx * sim.speed + lx * ls * sim.speed;
+    sim.vz = fz * sim.speed + lz * ls * sim.speed;
+    sim.x += sim.vx * dt;
+    sim.z += sim.vz * dt;
+
+    target.position.x = sim.x;
+    target.position.z = sim.z;
+    target.rotation.y = sim.heading;
+    if (wheelGroupRef.current) wheelGroupRef.current.rotation.y = sim.steerAngle * 0.5;
+
+    // End when parked
+    if (sim.phase >= 4 && ds < 1.0) {
+      simRef.current = null;
+      headlightsRef.current.forEach(m => {
+        if (m.material) {
+          (Array.isArray(m.material) ? m.material : [m.material]).forEach(mat => {
+            if (mat && mat.emissive) { mat.emissive.setHex(0); mat.emissiveIntensity = 0; }
+          });
+        }
+      });
+      busy.current = false;
+    }
+  });
 
   return (
     <group
