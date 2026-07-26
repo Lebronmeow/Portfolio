@@ -1013,8 +1013,6 @@ function PorscheModel() {
       const kickX = orig.x + 2.5;
       const kickZ = orig.z + 1.5;
 
-      const driftState = { angle: 0 };
-
       const tl = gsap.timeline({
         onComplete: () => {
           headlightsRef.current.forEach((mesh) => {
