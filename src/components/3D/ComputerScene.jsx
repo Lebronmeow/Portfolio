@@ -1030,25 +1030,27 @@ function PorscheModel() {
         },
       });
 
-      // Wide ellipse drift around the front of the desk
-      const CX = 0.0, CZ = 1.0;  // Center of ellipse
-      const RX = 4.5, RZ = 4.0;  // Radii
-      const startAngle = Math.atan2(orig.z - CZ, orig.x - CX);
-      const ellipseState = { angle: startAngle, prevX: orig.x, prevZ: orig.z };
+      // Circle drift — starts going forward (toward camera) from car's position
+      const CX = 0.0, CZ = -3.5;  // Center of circle
+      const RADIUS = 4.0;
+      // Car at [-4, -3.5] is on the circle at angle π (left side)
+      const startAngle = Math.PI;
+      // Animate CLOCKWISE so car goes forward first (+Z)
+      const circleState = { angle: startAngle, prevX: orig.x, prevZ: orig.z };
 
-      tl.to(ellipseState, {
-        angle: startAngle + Math.PI * 2,
+      tl.to(circleState, {
+        angle: startAngle - Math.PI * 2,
         duration: 5.5,
         ease: 'none',
         onUpdate: () => {
-          const a = ellipseState.angle;
-          // Ellipse position (smooth continuous curve)
-          const newX = CX + Math.cos(a) * RX;
-          const newZ = CZ + Math.sin(a) * RZ;
+          const a = circleState.angle;
+          // Circle position (smooth continuous curve)
+          const newX = CX + Math.cos(a) * RADIUS;
+          const newZ = CZ + Math.sin(a) * RADIUS;
 
           // Velocity direction
-          const vx = newX - ellipseState.prevX;
-          const vz = newZ - ellipseState.prevZ;
+          const vx = newX - circleState.prevX;
+          const vz = newZ - circleState.prevZ;
           const vLen = Math.sqrt(vx * vx + vz * vz);
 
           if (vLen > 0.001) {
@@ -1060,8 +1062,8 @@ function PorscheModel() {
 
           target.position.x = newX;
           target.position.z = newZ;
-          ellipseState.prevX = newX;
-          ellipseState.prevZ = newZ;
+          circleState.prevX = newX;
+          circleState.prevZ = newZ;
         },
       }, 0.5);
     }, ENGINE_START_DELAY);
