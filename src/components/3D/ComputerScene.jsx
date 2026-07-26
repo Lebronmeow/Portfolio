@@ -1030,92 +1030,144 @@ function PorscheModel({ waypoints }) {
         },
       });
 
-      // Waypoint-following drift path with per-waypoint drift angles
+      // ─── Realistic RWD Drift Physics ────────────────────────────────────
       if (!waypoints || waypoints.length < 2) {
         busy.current = false;
         return;
       }
 
-      // Add the original start position as the final park point
-      // Add an intermediate "forward" point between 1 and 2
-      // so the car goes forward first, then turns right to reach waypoint 2
-      const wp1 = waypoints[0];
-      const wp2 = waypoints[1];
-      const forwardPoint = { x: wp1.x, z: wp1.z + 1.5 }; // straight ahead from start
-      const path = [wp1, forwardPoint, ...waypoints.slice(1), { x: orig.x, z: orig.z }];
+      // Build path: start → forward → waypoints → return to start
+      const wpStart = waypoints[0];
+      const forwardPt = { x: wpStart.x, z: wpStart.z + 1.8 };
+      const path = [wpStart, forwardPt, ...waypoints.slice(1), { x: orig.x, z: orig.z }];
 
-      // Drift angle offset for each waypoint segment
-      const driftAngles = path.map((wp, i) => {
-        if (i === 0) return 0;
-        if (i === 1) return 0.2;     // forward: slight drift
-        if (i === 2) return 0.3;     // forward→2: slight left turn
-        if (i === 3) return 0.6;     // 3→4: drift
-        if (i === 4) return -0.2;    // 4→5: subtle left
-        if (i === 5) return 0.3;     // 5→6: slight right
-        if (i === 6) return -0.2;    // 6→7: subtle left
-        if (i === 7) return 0.4;     // 7→8: drift right
-        return 0.15;                  // others: subtle drift
-      });
-
-      const totalDist = path.reduce((acc, wp, i) => {
-        if (i === 0) return 0;
-        return acc + Math.sqrt((wp.x - path[i-1].x)**2 + (wp.z - path[i-1].z)**2);
-      }, 0);
-
-      const waypointState = {
-        progress: 0,
-        prevX: orig.x,
-        prevZ: orig.z,
-        heading: 2.5,
-        driftAngle: 0,
-        currentSeg: 0,
+      // Physics state — heading and velocity are INDEPENDENT
+      const sim = {
+        x: orig.x, z: orig.z,
+        heading: 2.5,         // which way the car is pointing (rad)
+        vx: 0, vz: 0,         // velocity vector (world space)
+        speed: 0,
+        steerAngle: 0,        // current steering input
+        targetIdx: 1,         // which waypoint we're driving toward
+        time: 0,
+        driftPhase: 0,        // 0=normal, 1=initiating, 2=holding, 3=recovering
       };
 
-      tl.to(waypointState, {
-        progress: 1,
-        duration: Math.max(3, totalDist * 0.45),
+      const MAX_SPEED = 7.0;
+      const ACCEL = 4.0;
+      const BRAKE = 0.97;
+      const STEER_RATE = 3.0;   // how fast steering responds
+      const GRIP = 0.92;        // lateral grip (lower = more slide)
+
+      tl.to(sim, {
+        time: 8.0,
+        duration: 8.0,
         ease: 'none',
         onUpdate: () => {
-          const p = waypointState.progress;
-          const segCount = path.length - 1;
-          const rawIdx = p * segCount;
-          const idx = Math.min(Math.floor(rawIdx), segCount - 1);
-          const frac = rawIdx - idx;
-          const smoothFrac = frac * frac * (3 - 2 * frac);
+          const dt = 0.016;
+          const t = sim.time;
 
-          const from = path[idx];
-          const to = path[idx + 1];
-          const newX = from.x + (to.x - from.x) * smoothFrac;
-          const newZ = from.z + (to.z - from.z) * smoothFrac;
+          // 1. Find which waypoint we're aiming for
+          let targetWP = path[sim.targetIdx];
+          if (!targetWP) targetWP = path[path.length - 1];
 
-          // Velocity direction
-          const vx = newX - waypointState.prevX;
-          const vz = newZ - waypointState.prevZ;
-          const vLen = Math.sqrt(vx * vx + vz * vz);
+          // 2. Direction to target waypoint
+          const dx = targetWP.x - sim.x;
+          const dz = targetWP.z - sim.z;
+          const dist = Math.sqrt(dx * dx + dz * dz);
+          const targetAngle = Math.atan2(dz, dx);
 
-          if (vLen > 0.001) {
-            const velAngle = Math.atan2(vz, vx);
-            const targetHeading = velAngle + Math.PI / 2;
-
-            // Smoothly adjust heading toward target
-            let headingDiff = targetHeading - waypointState.heading;
-            if (headingDiff > Math.PI) headingDiff -= Math.PI * 2;
-            if (headingDiff < -Math.PI) headingDiff += Math.PI * 2;
-            waypointState.heading += headingDiff * 0.2;
-
-            // Blend drift angle toward the current segment's target
-            const targetDrift = driftAngles[idx + 1] || 0;
-            waypointState.driftAngle += (targetDrift - waypointState.driftAngle) * 0.15;
-
-            // Apply heading + drift offset
-            target.rotation.y = waypointState.heading + waypointState.driftAngle;
+          // 3. Advance to next waypoint when close enough
+          if (dist < 1.0 && sim.targetIdx < path.length - 1) {
+            sim.targetIdx++;
+            // On reaching waypoint 2 (index 2), start drift initiation
+            if (sim.targetIdx === 2) sim.driftPhase = 1;
+            // On waypoint 3, hold drift
+            if (sim.targetIdx === 3) sim.driftPhase = 2;
+            // On waypoint 4, start recovery
+            if (sim.targetIdx === 4) sim.driftPhase = 3;
           }
 
-          target.position.x = newX;
-          target.position.z = newZ;
-          waypointState.prevX = newX;
-          waypointState.prevZ = newZ;
-          waypointState.currentSeg = idx;
+          // 4. Calculate desired steering angle based on phase
+          const headingVecX = -Math.sin(sim.heading);
+          const headingVecZ = -Math.cos(sim.heading);
+
+          // Angle between car heading and target direction
+          let angleToTarget = targetAngle - (sim.heading - Math.PI / 2);
+          if (angleToTarget > Math.PI) angleToTarget -= Math.PI * 2;
+          if (angleToTarget < -Math.PI) angleToTarget += Math.PI * 2;
+
+          let desiredSteer;
+
+          if (sim.driftPhase === 0) {
+            // Normal driving: steer toward target
+            desiredSteer = Math.max(-0.4, Math.min(0.4, angleToTarget * 0.5));
+          } else if (sim.driftPhase === 1) {
+            // Initiate drift: quick steering flick + throttle
+            // Oversteer to break rear traction
+            desiredSteer = 0.8; // Hard steer right to initiate
+          } else if (sim.driftPhase === 2) {
+            // Holding drift: countersteer
+            // The car is sliding, so we steer INTO the slide
+            const driftProgress = Math.sin(t * 0.5) * 0.3;
+            desiredSteer = -0.4 + driftProgress;
+          } else {
+            // Recovery: straighten out
+            desiredSteer = Math.max(-0.3, Math.min(0.3, angleToTarget * 0.3));
+          }
+
+          // 5. Smooth steering response
+          sim.steerAngle += (desiredSteer - sim.steerAngle) * 0.08;
+
+          // 6. Accelerate
+          if (sim.driftPhase === 1) {
+            // Throttle blip to initiate drift
+            sim.speed = Math.min(sim.speed + ACCEL * 1.5 * dt, MAX_SPEED);
+          } else {
+            sim.speed = Math.min(sim.speed + ACCEL * dt, MAX_SPEED);
+          }
+          sim.speed *= BRAKE;
+
+          // 7. Update heading based on steering and speed
+          // More steering + more speed = faster rotation
+          const turnRate = sim.steerAngle * (sim.speed / MAX_SPEED) * 2.5 * dt;
+          sim.heading += turnRate;
+
+          // 8. Calculate velocity
+          // During drift, the car moves in the direction of heading + slip
+          // The slip angle is the difference between heading and velocity direction
+          // During a drift, the velocity lags behind the heading
+
+          // Base movement: car moves forward in the direction it's pointing
+          const fwdX = -Math.sin(sim.heading);
+          const fwdZ = -Math.cos(sim.heading);
+
+          // Apply lateral grip reduction during drift
+          const gripFactor = sim.driftPhase >= 1 && sim.driftPhase <= 2 ? GRIP : 1.0;
+
+          // Velocity = forward direction + lateral slip
+          const lateralSlip = sim.steerAngle * (1 - gripFactor) * 0.5;
+          const slipAngle = sim.driftPhase >= 1 ? sim.steerAngle * 0.6 : 0;
+
+          // Move in the direction of the velocity vector
+          const moveAngle = sim.heading + slipAngle;
+          sim.vx = -Math.sin(moveAngle) * sim.speed;
+          sim.vz = -Math.cos(moveAngle) * sim.speed;
+
+          // Apply lateral drift offset
+          const latX = -Math.cos(sim.heading) * lateralSlip * sim.speed * dt;
+          const latZ = Math.sin(sim.heading) * lateralSlip * sim.speed * dt;
+
+          sim.x += sim.vx * dt + latX;
+          sim.z += sim.vz * dt + latZ;
+
+          // 9. Apply to Three.js objects
+          target.position.x = sim.x;
+          target.position.z = sim.z;
+          target.rotation.y = sim.heading;
+
+          // 10. Subtle body lean (visual only)
+          // target.rotation.z = sim.steerAngle * 0.05; // uncomment if model supports it
         },
       }, 0.5);
     }, ENGINE_START_DELAY);
