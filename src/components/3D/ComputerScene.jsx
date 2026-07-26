@@ -1303,6 +1303,7 @@ const DRIFT_PATH_POINTS = [
 // ─── Interactive Waypoint Placer ────────────────────────────────────
 function WaypointPlacer({ waypoints, setWaypoints }) {
   const { raycaster, pointer, camera, scene } = useThree();
+  const [showCoords, setShowCoords] = useState(false);
 
   const handleClick = (e) => {
     e.stopPropagation();
@@ -1321,16 +1322,7 @@ function WaypointPlacer({ waypoints, setWaypoints }) {
     const handleKey = (e) => {
       if (e.key === 'z' || e.key === 'Z') setWaypoints(prev => prev.slice(0, -1));
       if (e.key === 'c' || e.key === 'C') setWaypoints([]);
-      if (e.key === 's' || e.key === 'S') {
-        setWaypoints(prev => {
-          console.log('=== WAYPOINTS ===');
-          prev.forEach((wp, i) => console.log(`${i + 1}: x=${wp.x}, z=${wp.z}`));
-          console.log('=== COPY THESE ===');
-          const str = prev.map(wp => `{ x: ${wp.x}, z: ${wp.z} }`).join(',\n  ');
-          console.log(`[\n  ${str},\n]`);
-          return prev;
-        });
-      }
+      if (e.key === 's' || e.key === 'S') setShowCoords(prev => !prev);
     };
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
@@ -1361,6 +1353,18 @@ function WaypointPlacer({ waypoints, setWaypoints }) {
       >
         {`Click floor (${waypoints.length}) — Z undo  |  C clear  |  S save`}
       </Text>
+      {showCoords && waypoints.length > 0 && (
+        <Text
+          position={[-7, 2.5, 0]}
+          fontSize={0.22}
+          color="#ffdd44"
+          anchorX="left"
+          anchorY="top"
+          frustumCulled={false}
+        >
+          {waypoints.map((wp, i) => `${i + 1}: ${wp.x}, ${wp.z}`).join('\n')}
+        </Text>
+      )}
     </group>
   );
 }
