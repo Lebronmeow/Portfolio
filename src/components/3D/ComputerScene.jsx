@@ -1032,50 +1032,26 @@ function PorscheModel() {
         },
       });
 
-      // Smooth continuous drift path — single animation with interpolation
-      // This avoids pauses between keyframes
-      const pathPoints = [
-        { x: -4.0, z: -3.5, rot: 2.5 },   // Start
-        { x: -6.0, z: -1.0, rot: 1.0 },   // Wider left in front of keyboard
-        { x: -4.0, z: 3.0, rot: 0.0 },    // Front of keyboard
-        { x: 0.0, z: 4.5, rot: 3.0 },     // Rear faces camera
-        { x: 4.0, z: 3.5, rot: 1.8 },     // Right side of CRT, sideways
-        { x: 5.5, z: 0.0, rot: 1.0 },     // Further right
-        { x: 4.0, z: -3.0, rot: 0.0 },    // Behind CRT, facing front
-        { x: 0.0, z: -5.0, rot: 5.8 },    // Wide behind
-        { x: -3.0, z: -5.0, rot: 5.0 },   // Coming back
-        { x: orig.x, z: orig.z, rot: origRot }, // Park at start
-      ];
+      // Smooth circular drift — car always faces direction of travel
+      const CIRCLE_CENTER = { x: 0.5, z: -0.5 };
+      const RADIUS = 5.0;
+      // Starting angle on the circle (matches car's actual position)
+      const startAngle = Math.atan2(orig.z - CIRCLE_CENTER.z, orig.x - CIRCLE_CENTER.x);
+      // Car faces tangent to circle = forward direction
+      const driftState = { angle: startAngle };
 
-      const pathDuration = 6.5;
-      const pathState = { progress: 0 };
-
-      tl.to(pathState, {
-        progress: 1,
-        duration: pathDuration,
+      tl.to(driftState, {
+        angle: startAngle + Math.PI * 2,
+        duration: 6.5,
         ease: 'none',
         onUpdate: () => {
-          const p = pathState.progress;
-          // Calculate which segment we're in
-          const segCount = pathPoints.length - 1;
-          const rawIdx = p * segCount;
-          const idx = Math.min(Math.floor(rawIdx), segCount - 1);
-          const frac = rawIdx - idx;
-
-          // Smooth step for each segment (ease in/out within segment)
-          const smoothFrac = frac * frac * (3 - 2 * frac); // smoothstep
-
-          const from = pathPoints[idx];
-          const to = pathPoints[idx + 1];
-
-          target.position.x = from.x + (to.x - from.x) * smoothFrac;
-          target.position.z = from.z + (to.z - from.z) * smoothFrac;
-
-          // Interpolate rotation with shortest path
-          let rotDiff = to.rot - from.rot;
-          if (rotDiff > Math.PI) rotDiff -= Math.PI * 2;
-          if (rotDiff < -Math.PI) rotDiff += Math.PI * 2;
-          target.rotation.y = from.rot + rotDiff * smoothFrac;
+          const a = driftState.angle;
+          // Position on circle
+          target.position.x = CIRCLE_CENTER.x + Math.cos(a) * RADIUS;
+          target.position.z = CIRCLE_CENTER.z + Math.sin(a) * RADIUS;
+          // Car always faces the direction of travel (tangent to circle)
+          // + tiny drift angle so rear slightly slides out
+          target.rotation.y = a + Math.PI / 2 + 0.25;
         },
       }, 0.5);
     }, ENGINE_START_DELAY);
@@ -1085,7 +1061,7 @@ function PorscheModel() {
     <group
       ref={groupRef}
       position={[-4.0, 0.32, -3.5]}
-      rotation={[0, 2.5, 0]}
+      rotation={[0, 2.5 + Math.PI, 0]}
       scale={[0.5, 0.5, 0.5]}
       onClick={handleClick}
       onPointerOver={(e) => { e.stopPropagation(); document.body.style.cursor = 'pointer'; }}
