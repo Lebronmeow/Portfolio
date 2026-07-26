@@ -1005,36 +1005,7 @@ function PorscheModel() {
       // Phase 2: 360 circle behind the CRT
       // Phase 3: Return to start and park
 
-      const PHASE1_TIME = 1.0;
-      const PHASE2_TIME = 5.5;
-      const PHASE3_TIME = 1.0;
-
-      // The rear kick-out point (where the car's rear faces the user)
-      const kickX = orig.x + 2.5;
-      const kickZ = orig.z + 1.5;
-
-      const tl = gsap.timeline({
-        onComplete: () => {
-          headlightsRef.current.forEach((mesh) => {
-            if (mesh.material) {
-              const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
-              mats.forEach((mat) => {
-                if (mat && mat.emissive) {
-                  mat.emissive.setHex(0x000000);
-                  mat.emissiveIntensity = 0;
-                }
-              });
-            }
-          });
-          busy.current = false;
-        },
-      });
-
       // ─── Physics-Based Drift Controller ────────────────────────────────
-      // Waypoints are ONLY drift triggers, NOT navigation targets.
-      // The car's trajectory comes from physics, not from waypoint positions.
-
-      // Physics state
       const sim = {
         x: orig.x, z: orig.z,
         heading: 2.5,
@@ -1045,36 +1016,31 @@ function PorscheModel() {
         targetSteer: 0,
         rearGrip: 1.0,
         throttle: 0,
-        phase: 0,        // 0=drive, 1=initiate, 2=drift, 3=recover, 4=return
-        time: 0,
+        phase: 0,
+        elapsed: 0,
         initTimer: 0,
         driftTimer: 0,
-        // Fixed target for phase 4 (return to start)
-        returnTarget: { x: orig.x, z: orig.z },
       };
 
-      // Physics constants
       const MAX_SPEED = 10.0;
       const ACCEL = 5.0;
       const DECEL = 0.997;
       const STEER_DAMP = 0.12;
-      const YAW_INERTIA = 0.90;
       const YAW_RESPONSE = 15.0;
-      const YAW_DAMP = 0.92;
       const GRIP_DRIFT = 0.25;
-      const GRIP_RECOVER = 0.015;
 
-      // Phase transition check based on distance to waypoints
-      // We use the waypoints as PHYSICAL LOCATIONS the car passes near
-      const wp2 = DRIFT_PATH_POINTS[1]; // waypoint 2 = drift initiation
-      const wp4 = DRIFT_PATH_POINTS[3]; // waypoint 4 = drift exit
+      const wp2 = DRIFT_PATH_POINTS[1];
+      const wp4 = DRIFT_PATH_POINTS[3];
+      let lastTime = 0;
 
-      tl.to(sim, {
-        time: 14.0,
+      gsap.to(sim, {
+        elapsed: 14.0,
         duration: 14.0,
         ease: 'none',
         onUpdate: () => {
-          const dt = 0.016;
+          const dt = sim.elapsed - lastTime;
+          lastTime = sim.elapsed;
+          if (dt <= 0) return;
 
           // ── Phase transitions based on position ──
           const distToWp2 = Math.sqrt((sim.x - wp2.x)**2 + (sim.z - wp2.z)**2);
@@ -1205,7 +1171,21 @@ function PorscheModel() {
             wheelGroupRef.current.rotation.y = sim.steerAngle * 0.5;
           }
         },
-      }, 0.5);
+        onComplete: () => {
+          headlightsRef.current.forEach((mesh) => {
+            if (mesh.material) {
+              const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+              mats.forEach((mat) => {
+                if (mat && mat.emissive) {
+                  mat.emissive.setHex(0x000000);
+                  mat.emissiveIntensity = 0;
+                }
+              });
+            }
+          });
+          busy.current = false;
+        },
+      });
     }, ENGINE_START_DELAY);
   };
 
