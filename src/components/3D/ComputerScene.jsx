@@ -941,12 +941,13 @@ function PorscheModel() {
   const originalPos = useRef({ x: -4.0, y: 0.32, z: -3.5 });
   const originalRot = useRef(2.5);
   const headlightsRef = useRef([]);
-  const glowRef = useRef(null);
+  const wheelsRef = useRef([]);
 
-  // Find headlight meshes and store references
+  // Find headlight and wheel meshes
   useEffect(() => {
     if (!scene) return;
     const lights = [];
+    const wheels = [];
     scene.traverse((obj) => {
       if (obj.isMesh) {
         obj.castShadow = true;
@@ -955,9 +956,13 @@ function PorscheModel() {
         if (name.includes('vehiclelights') || (name.includes('lights') && name.includes('lod0'))) {
           lights.push(obj);
         }
+        if (name.includes('wheel') || name.includes('tyre') || name.includes('ssr')) {
+          wheels.push(obj);
+        }
       }
     });
     headlightsRef.current = lights;
+    wheelsRef.current = wheels;
   }, [scene]);
 
   const handleClick = (e) => {
@@ -982,91 +987,99 @@ function PorscheModel() {
       }
     });
 
-    // 2. Play engine sounds
+    // 2. Play engine start sound
     playPorscheStart();
-    setTimeout(() => playPorscheMove(), 300);
 
-    // 3. Natural RC drift animation
-    const CIRCLE_CENTER = { x: 1.5, z: 0.5 };
-    const RADIUS = 5.5;
-    const DRIFT_TIME = 7;
-    const DRIFT_ANGLE = 0.35; // How much the car is angled during drift
+    // 3. Wait for engine start, then begin drift
+    const ENGINE_START_DELAY = 1500; // ms to wait for engine sound to play
 
-    // Animate a virtual angle from 0 to 2π
-    const driftState = { angle: 0 };
-    let lastAngle = 0;
+    setTimeout(() => {
+      playPorscheMove();
 
-    const startAngle = Math.atan2(orig.z - CIRCLE_CENTER.z, orig.x - CIRCLE_CENTER.x);
-    const startRot = startAngle + Math.PI / 2;
+      // Path: 360 circle behind the desk (behind flowers and CRT)
+      const CIRCLE_CENTER = { x: -0.5, z: -4.0 };
+      const RADIUS = 4.0;
+      const DRIFT_TIME = 6;
+      const DRIFT_ANGLE = 0.4;
 
-    const tl = gsap.timeline({
-      onComplete: () => {
-        headlightsRef.current.forEach((mesh) => {
-          if (mesh.material) {
-            const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
-            mats.forEach((mat) => {
-              if (mat && mat.emissive) {
-                mat.emissive.setHex(0x000000);
-                mat.emissiveIntensity = 0;
-              }
-            });
-          }
-        });
-        busy.current = false;
-      },
-    });
+      // Calculate angle of start position relative to circle center
+      const dx = orig.x - CIRCLE_CENTER.x;
+      const dz = orig.z - CIRCLE_CENTER.z;
+      const startAngle = Math.atan2(dz, dx);
 
-    // Move to circle start point
-    const entryX = CIRCLE_CENTER.x + Math.cos(startAngle) * RADIUS;
-    const entryZ = CIRCLE_CENTER.z + Math.sin(startAngle) * RADIUS;
+      // Move to circle path first
+      const entryX = CIRCLE_CENTER.x + Math.cos(startAngle) * RADIUS;
+      const entryZ = CIRCLE_CENTER.z + Math.sin(startAngle) * RADIUS;
 
-    tl.to(target.position, {
-      x: entryX,
-      z: entryZ,
-      duration: 0.5,
-      ease: 'power2.out',
-    }, 0)
-    .to(target.rotation, {
-      y: startRot,
-      duration: 0.3,
-      ease: 'power2.out',
-    }, 0);
+      const driftState = { angle: startAngle };
 
-    // Smooth circular drift with drift angle offset
-    tl.to(driftState, {
-      angle: Math.PI * 2,
-      duration: DRIFT_TIME,
-      ease: 'none',
-      onUpdate: () => {
-        const a = driftState.angle;
-        const delta = a - lastAngle;
-        lastAngle = a;
+      const tl = gsap.timeline({
+        onComplete: () => {
+          // Turn off headlights
+          headlightsRef.current.forEach((mesh) => {
+            if (mesh.material) {
+              const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+              mats.forEach((mat) => {
+                if (mat && mat.emissive) {
+                  mat.emissive.setHex(0x000000);
+                  mat.emissiveIntensity = 0;
+                }
+              });
+            }
+          });
+          busy.current = false;
+        },
+      });
 
-        // Position on circle
-        target.position.x = CIRCLE_CENTER.x + Math.cos(a) * RADIUS;
-        target.position.z = CIRCLE_CENTER.z + Math.sin(a) * RADIUS;
+      // Move to circle entry point
+      tl.to(target.position, {
+        x: entryX,
+        z: entryZ,
+        duration: 0.4,
+        ease: 'power2.out',
+      }, 0)
+      .to(target.rotation, {
+        y: startAngle - Math.PI / 2,
+        duration: 0.3,
+        ease: 'power2.out',
+      }, 0);
 
-        // Natural drift angle: face tangent to circle + drift offset
-        // The drift offset makes the car's rear slide out
-        const tangent = a + Math.PI / 2;
-        // Add drift angle - car faces slightly into the turn (countersteer)
-        const driftOffset = Math.sin(a) * 0.15;
-        target.rotation.y = tangent + DRIFT_ANGLE + driftOffset;
-      },
-    }, 0.5);
+      // 360 circle drift behind the desk
+      tl.to(driftState, {
+        angle: startAngle + Math.PI * 2,
+        duration: DRIFT_TIME,
+        ease: 'none',
+        onUpdate: () => {
+          const a = driftState.angle;
+          // Position on circle
+          target.position.x = CIRCLE_CENTER.x + Math.cos(a) * RADIUS;
+          target.position.z = CIRCLE_CENTER.z + Math.sin(a) * RADIUS;
+          // Face direction of travel (tangent to circle) + drift angle
+          // For a rear-wheel-drive drift, the car's rear slides out
+          // so the car body faces slightly INTO the turn
+          const tangent = a - Math.PI / 2;
+          target.rotation.y = tangent - DRIFT_ANGLE;
 
-    // Return to original position in a smooth line
-    tl.to(target.position, {
-      x: orig.x,
-      z: orig.z,
-      duration: 0.7,
-      ease: 'power2.inOut',
-    }, DRIFT_TIME + 0.7)
-    .to(target.rotation, {
-      y: origRot,
-      duration: 0.4,
-      ease: 'power2.out',
-    }, DRIFT_TIME + 0.7);
+          // Rotate all wheels
+          wheelsRef.current.forEach((wheel) => {
+            wheel.rotation.x += 0.15;
+          });
+        },
+      }, 0.4);
+
+      // Return to original position
+      tl.to(target.position, {
+        x: orig.x,
+        z: orig.z,
+        duration: 0.6,
+        ease: 'power2.inOut',
+      }, DRIFT_TIME + 0.6)
+      .to(target.rotation, {
+        y: originalRot.current,
+        duration: 0.4,
+        ease: 'power2.out',
+      }, DRIFT_TIME + 0.6);
+    }, ENGINE_START_DELAY);
   };
 
   return (
