@@ -93,7 +93,7 @@ function isKeyboardKey(obj) {
 }
 
 // ─── Main 3D Model with Dynamic Screen Text Overlay ──────────────────────────
-function MainModel({ onEnter }) {
+function MainModel({ onEnter, onLoad, onProgress }) {
   const { gl, raycaster, pointer, camera, scene } = useThree();
   const [model, setModel] = useState(null);
   const [screenData, setScreenData] = useState(null);
@@ -152,7 +152,7 @@ function MainModel({ onEnter }) {
           obj.getWorldPosition(keyPos);
           keyPos.y += 0.6;
           setHintState({
-            text: "⌨️ try clicking keys ⌨️",
+            text: "try to click me",
             position: keyPos.toArray(),
           });
         } else if (obj.userData?.isVase) {
@@ -177,7 +177,7 @@ function MainModel({ onEnter }) {
             : obj
           ).getWorldPosition(pos);
           pos.y += 3.5;
-          setHintState({ text: "✦ it might spin ✦", position: pos.toArray() });
+          setHintState({ text: "make it spin!", position: pos.toArray() });
         } else {
           let isFlowerDescendant = false;
           let p = obj.parent;
@@ -205,7 +205,7 @@ function MainModel({ onEnter }) {
             ).getWorldPosition(pos);
             pos.y += 3.5;
             setHintState({
-              text: "✦ it might spin ✦",
+              text: "make it spin!",
               position: pos.toArray(),
             });
           } else {
@@ -488,10 +488,19 @@ function MainModel({ onEnter }) {
         });
 
         setModel(loadedScene);
+        // Signal that the main scene model is fully loaded and processed
+        onLoad?.();
       },
-      undefined,
+      (xhr) => {
+        // Always fire progress so the loading screen doesn't appear stuck
+        if (onProgress) {
+          onProgress(xhr.total > 0 ? xhr.loaded / xhr.total : 0);
+        }
+      },
       (err) => {
         console.error("GLB mainscene load error:", err);
+        // Still signal loaded so the loading screen doesn't hang forever
+        onLoad?.();
       },
     );
 
@@ -1551,7 +1560,7 @@ const MINECRAFT_MUSIC_URL =
   "https://archive.org/download/08-minecraft_202302/18%20-%20Sweden.mp3";
 
 // ─── Main Export ──────────────────────────────────────────────────────────────
-export default function ComputerScene({ onEnter, isZoomedIn, onNavigate }) {
+export default function ComputerScene({ onEnter, isZoomedIn, onNavigate, onLoad, onProgress }) {
   const [musicMuted, setMusicMuted] = useState(true);
   const musicRef = useRef(null);
 
@@ -1608,7 +1617,7 @@ export default function ComputerScene({ onEnter, isZoomedIn, onNavigate }) {
         <GridFloor />
 
         <Suspense fallback={null}>
-          <MainModel onEnter={onEnter} />
+          <MainModel onEnter={onEnter} onLoad={onLoad} onProgress={onProgress} />
         </Suspense>
 
         <FloorLabels onNavigate={onNavigate} />
@@ -1622,7 +1631,7 @@ export default function ComputerScene({ onEnter, isZoomedIn, onNavigate }) {
 
         <HoverHint
           position={[4.57, 0.1, -0.3]}
-          text="🐱 pet the cat 🐱"
+          text="meow? pet me?"
           floatHeight={1.5}
         />
         <HoverHint position={[-4.0, 0.5, -3.5]} text="Drift?" />
