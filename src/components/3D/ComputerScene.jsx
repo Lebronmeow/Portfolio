@@ -1030,40 +1030,70 @@ function PorscheModel() {
         },
       });
 
-      // Circle drift — starts going forward (toward camera) from car's position
-      const CX = 0.0, CZ = -3.5;  // Center of circle
-      const RADIUS = 4.0;
-      // Car at [-4, -3.5] is on the circle at angle π (left side)
-      const startAngle = Math.PI;
-      // Animate CLOCKWISE so car goes forward first (+Z)
-      const circleState = { angle: startAngle, prevX: orig.x, prevZ: orig.z };
+      // Real drift physics: car accelerates, steers, and drifts naturally
+      const physics = {
+        x: orig.x, z: orig.z,          // position
+        heading: 2.5,                   // which way car points (rad)
+        speed: 0,                       // current speed
+        steerAngle: 0,                  // steering input
+        driftAngle: 0,                  // how much rear has slid out
+        time: 0,
+      };
 
-      tl.to(circleState, {
-        angle: startAngle - Math.PI * 2,
+      // Steering input over time (creates the drift pattern)
+      const getSteering = (t) => {
+        // 0-1s: slight right to start turning
+        // 1-2s: hard right (rear kicks out)
+        // 2-4s: counter-steer left to maintain drift
+        // 4-5s: straighten out
+        if (t < 1.0) return 0.3;           // ease into turn
+        if (t < 1.8) return 1.2;           // sharp turn, rear kicks out
+        if (t < 3.5) return -0.6;          // counter-steer to hold drift
+        if (t < 4.5) return -0.2;          // straightening
+        return 0;                           // straight
+      };
+
+      const ACCEL = 3.0;       // acceleration force
+      const FRICTION = 0.98;   // speed friction
+      const STEER_SPEED = 2.5; // how fast car turns
+      const DRIFT_FACTOR = 0.6; // how much rear slides
+
+      tl.to(physics, {
+        time: 5.5,
         duration: 5.5,
         ease: 'none',
         onUpdate: () => {
-          const a = circleState.angle;
-          // Circle position (smooth continuous curve)
-          const newX = CX + Math.cos(a) * RADIUS;
-          const newZ = CZ + Math.sin(a) * RADIUS;
+          const t = physics.time;
+          const dt = 0.016; // ~60fps step
 
-          // Velocity direction
-          const vx = newX - circleState.prevX;
-          const vz = newZ - circleState.prevZ;
-          const vLen = Math.sqrt(vx * vx + vz * vz);
+          // 1. Steering input
+          const steerTarget = getSteering(t);
+          physics.steerAngle += (steerTarget - physics.steerAngle) * 0.1;
 
-          if (vLen > 0.001) {
-            const velAngle = Math.atan2(vz, vx);
-            // Smooth drift angle that peaks on the sides, minimal at front/back
-            const driftAngle = 0.3 + Math.abs(Math.sin(a)) * 0.6;
-            target.rotation.y = velAngle + Math.PI / 2 + driftAngle;
-          }
+          // 2. Accelerate forward
+          physics.speed = Math.min(physics.speed + ACCEL * dt, 6.0);
+          physics.speed *= FRICTION;
 
-          target.position.x = newX;
-          target.position.z = newZ;
-          circleState.prevX = newX;
-          circleState.prevZ = newZ;
+          // 3. Turn the car based on steering and speed
+          const turnRate = physics.steerAngle * STEER_SPEED * dt;
+          physics.heading += turnRate;
+
+          // 4. Drift physics: rear slides out when turning hard
+          const targetDrift = physics.steerAngle * DRIFT_FACTOR * (physics.speed / 4.0);
+          physics.driftAngle += (targetDrift - physics.driftAngle) * 0.08;
+
+          // 5. Move the car in the direction it's heading + drift offset
+          // Car model faces -Z at rotation 0
+          const moveAngle = physics.heading + physics.driftAngle;
+          const dx = -Math.sin(moveAngle) * physics.speed * dt;
+          const dz = -Math.cos(moveAngle) * physics.speed * dt;
+          physics.x += dx;
+          physics.z += dz;
+
+          // 6. Apply to Three.js objects
+          target.position.x = physics.x;
+          target.position.z = physics.z;
+          target.rotation.y = physics.heading;
         },
       }, 0.5);
     }, ENGINE_START_DELAY);
