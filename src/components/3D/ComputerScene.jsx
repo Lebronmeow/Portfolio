@@ -1062,24 +1062,13 @@ function PorscheModel() {
     if (vLen > 0.001) {
       const velAngle = Math.atan2(vz, vx);
 
-      // Drift angle per segment — creates visible drift effect
-      // 0 = normal, 0.8+ = rear sliding out dramatically
-      const driftBySeg = [0, 0, -1.0, -3.0, -1.7, -3.0, -4.0, -0.2, 0, 0];
-      const targetDrift = driftBySeg[Math.min(idx + 1, driftBySeg.length - 1)] || 0;
-      // Add oscillation within segment for natural drift feel
-      const osc = Math.sin(frac * Math.PI * 2) * 0.2;
-      let dDiff = targetDrift + osc - sim.driftAngle;
-      // Handle angle wrapping
-      if (dDiff > Math.PI) dDiff -= Math.PI * 2;
-      if (dDiff < -Math.PI) dDiff += Math.PI * 2;
-      const blendRate = (idx >= 2 && idx <= 3) ? 0.5 : 0.2;
-      sim.driftAngle += dDiff * blendRate;
-      // Normalize drift angle
-      if (sim.driftAngle > Math.PI * 2) sim.driftAngle -= Math.PI * 2;
-      if (sim.driftAngle < 0) sim.driftAngle += Math.PI * 2;
+      // Drift offset per segment — no blending, instant per segment
+      const driftBySeg = [0, 0, 0.8, 2.5, 1.5, 0.8, 0.3, 0, 0, 0];
+      const driftOffset = driftBySeg[Math.min(idx + 1, driftBySeg.length - 1)] || 0;
+      const osc = Math.sin(frac * Math.PI * 2) * 0.15;
 
       // Heading = velocity direction + 90° for car model + drift offset
-      const targetHeading = velAngle + Math.PI / 2 + sim.driftAngle;
+      const targetHeading = velAngle + Math.PI / 2 + driftOffset + osc;
       let hDiff = targetHeading - sim.heading;
       if (hDiff > Math.PI) hDiff -= Math.PI * 2;
       if (hDiff < -Math.PI) hDiff += Math.PI * 2;
