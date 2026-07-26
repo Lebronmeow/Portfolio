@@ -1068,7 +1068,8 @@ function PorscheModel() {
       const osc = Math.sin(frac * Math.PI * 2) * 0.15;
 
       // Heading = velocity direction + 90° for car model + drift offset
-      const targetHeading = velAngle + Math.PI / 2 + Math.PI + driftOffset + osc;
+      const flip = Math.abs(driftOffset) > 0.1 ? Math.PI : 0;
+      const targetHeading = velAngle + Math.PI / 2 + flip + driftOffset + osc;
       let hDiff = targetHeading - sim.heading;
       if (hDiff > Math.PI) hDiff -= Math.PI * 2;
       if (hDiff < -Math.PI) hDiff += Math.PI * 2;
