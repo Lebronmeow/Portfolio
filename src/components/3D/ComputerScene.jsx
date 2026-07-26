@@ -1168,6 +1168,57 @@ function CameraRig({ isZoomedIn }) {
   );
 }
 
+// ─── Waypoint Marker ────────────────────────────────────────────────────
+function WaypointMarker({ position, number }) {
+  return (
+    <group position={[position[0], 0.05, position[1]]}>
+      <mesh rotation={[-Math.PI / 2, 0, 0]}>
+        <planeGeometry args={[0.8, 0.8]} />
+        <meshBasicMaterial color="#00ff88" transparent opacity={0.3} side={THREE.DoubleSide} />
+      </mesh>
+      <Text
+        position={[0, 0.1, 0]}
+        fontSize={0.35}
+        color="#00ff88"
+        anchorX="center"
+        anchorY="middle"
+        rotation={[-Math.PI / 2, 0, 0]}
+        outlineWidth={0.05}
+        outlineColor="#000"
+        outlineOpacity={0.8}
+        frustumCulled={false}
+      >
+        {String(number)}
+      </Text>
+    </group>
+  );
+}
+
+// ─── Reference Waypoints (numbered markers for planning the drift path) ──
+function ReferenceWaypoints() {
+  // Points around the desk in a rough circle, labeled 1-8
+  const points = [
+    { x: -4.0, z: -3.5, n: 1 },  // Start (car's position)
+    { x: -4.5, z: 0.0, n: 2 },   // Left of desk
+    { x: -3.0, z: 3.0, n: 3 },   // Front-left
+    { x: 0.0, z: 4.0, n: 4 },    // Front-center (in front of keyboard)
+    { x: 3.0, z: 3.5, n: 5 },    // Front-right
+    { x: 4.5, z: 0.5, n: 6 },    // Right of desk
+    { x: 3.0, z: -2.5, n: 7 },   // Back-right
+    { x: 0.0, z: -4.0, n: 8 },   // Behind desk
+    { x: -2.0, z: -4.5, n: 9 },  // Back-left
+    { x: -4.0, z: -3.5, n: 10 }, // Back to start
+  ];
+
+  return (
+    <group>
+      {points.map((p) => (
+        <WaypointMarker key={p.n} position={[p.x, p.z]} number={p.n} />
+      ))}
+    </group>
+  );
+}
+
 // ─── Main Export ──────────────────────────────────────────────────────────────
 export default function ComputerScene({ onEnter, isZoomedIn }) {
   return (
@@ -1183,7 +1234,7 @@ export default function ComputerScene({ onEnter, isZoomedIn }) {
     >
       <color attach="background" args={['#111114']} />
 
-      {/* Core scene — loads immediately, no suspense */}
+      {/* Core scene */}
       <ambientLight intensity={0.9} />
       <directionalLight
         position={[10, 15, 10]}
@@ -1195,29 +1246,26 @@ export default function ComputerScene({ onEnter, isZoomedIn }) {
       <directionalLight position={[-8, 10, -5]} intensity={0.5} color="#88b5ff" />
       <pointLight position={[0, 5, 0]} intensity={0.4} color="#ffffff" />
 
-      {/* Floor */}
       <GridFloor />
 
       <Suspense fallback={null}>
-        {/* GLTF Model + 3D Text on Screen */}
         <MainModel onEnter={onEnter} />
       </Suspense>
 
-      {/* Floor Labels */}
       <FloorLabels />
 
-      {/* Extra models — each in their own Suspense so they don't block the scene */}
+      {/* Reference markers around the desk */}
+      <ReferenceWaypoints />
+
       <Suspense fallback={null}>
         <CatModel />
       </Suspense>
       <Suspense fallback={null}>
-        <PorscheModel />
+        <PorscheModel waypoints={[]} />
       </Suspense>
 
-      {/* Floating Hints */}
       <HoverHint position={[4.57, 0.5, -0.30]} text="🐱 pet the cat 🐱" />
 
-      {/* Camera Rig */}
       <CameraRig isZoomedIn={isZoomedIn} />
     </Canvas>
   );
