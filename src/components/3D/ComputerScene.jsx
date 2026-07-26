@@ -93,8 +93,8 @@ function MainModel({ onEnter }) {
     const brightness = Math.max(0.5, Math.min(1.0, pulse + micro));
 
     if (screenMatRef.current) {
-      const val = brightness * 0.35;
-      screenMatRef.current.color.setRGB(val, val, val * 1.15);
+      const val = brightness * 0.15;
+      screenMatRef.current.color.setRGB(val, val, val * 1.3);
     }
     if (textRef.current) {
       textRef.current.fillOpacity = Math.max(0.5, brightness);
@@ -335,7 +335,7 @@ function MainModel({ onEnter }) {
             // ── Find the Monitor Screen mesh ──
             if (mat && !Array.isArray(mat) && mat.name === 'Monitor Screen') {
               // Replace with a plain dark CRT material (no texture needed)
-              const darkMat = new THREE.MeshBasicMaterial({ color: '#1a1a2e' });
+              const darkMat = new THREE.MeshBasicMaterial({ color: '#0d0d1a' });
               darkMat.name = 'Monitor Screen';
               obj.material = darkMat;
               screenMatRef.current = darkMat;
@@ -395,7 +395,7 @@ function MainModel({ onEnter }) {
             if (Array.isArray(mat)) {
               mat.forEach((m, idx) => {
                 if (m && m.name === 'Monitor Screen') {
-                  const darkMat = new THREE.MeshBasicMaterial({ color: '#1a1a2e' });
+                  const darkMat = new THREE.MeshBasicMaterial({ color: '#0d0d1a' });
                   darkMat.name = 'Monitor Screen';
                   obj.material[idx] = darkMat;
                   screenMatRef.current = darkMat;
