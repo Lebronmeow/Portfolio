@@ -934,7 +934,7 @@ function playPorscheMove() {
 }
 
 // ─── Porsche Model with click-to-drift animation ───────────────────────
-function PorscheModel() {
+function PorscheModel({ waypoints }) {
   const groupRef = useRef();
   const { scene } = useGLTF('/models/porsche.glb');
   const busy = useRef(false);
@@ -1030,70 +1030,73 @@ function PorscheModel() {
         },
       });
 
-      // Real drift physics: car accelerates, steers, and drifts naturally
-      const physics = {
-        x: orig.x, z: orig.z,          // position
-        heading: 2.5,                   // which way car points (rad)
-        speed: 0,                       // current speed
-        steerAngle: 0,                  // steering input
-        driftAngle: 0,                  // how much rear has slid out
-        time: 0,
+      // Waypoint-following drift path
+      if (!waypoints || waypoints.length < 2) {
+        busy.current = false;
+        return;
+      }
+
+      // Add the original start position as the final park point
+      const path = [...waypoints, { x: orig.x, z: orig.z }];
+      const totalDist = path.reduce((acc, wp, i) => {
+        if (i === 0) return 0;
+        return acc + Math.sqrt((wp.x - path[i-1].x)**2 + (wp.z - path[i-1].z)**2);
+      }, 0);
+
+      const waypointState = {
+        progress: 0,
+        prevX: orig.x,
+        prevZ: orig.z,
+        heading: 2.5,
+        driftAngle: 0,
       };
 
-      // Steering input over time (creates the drift pattern)
-      const getSteering = (t) => {
-        // 0-1s: slight right to start turning
-        // 1-2s: hard right (rear kicks out)
-        // 2-4s: counter-steer left to maintain drift
-        // 4-5s: straighten out
-        if (t < 1.0) return 0.3;           // ease into turn
-        if (t < 1.8) return 1.2;           // sharp turn, rear kicks out
-        if (t < 3.5) return -0.6;          // counter-steer to hold drift
-        if (t < 4.5) return -0.2;          // straightening
-        return 0;                           // straight
-      };
-
-      const ACCEL = 3.0;       // acceleration force
-      const FRICTION = 0.98;   // speed friction
-      const STEER_SPEED = 2.5; // how fast car turns
-      const DRIFT_FACTOR = 0.6; // how much rear slides
-
-      tl.to(physics, {
-        time: 5.5,
-        duration: 5.5,
+      tl.to(waypointState, {
+        progress: 1,
+        duration: Math.max(3, totalDist * 0.5),
         ease: 'none',
         onUpdate: () => {
-          const t = physics.time;
-          const dt = 0.016; // ~60fps step
+          const p = waypointState.progress;
+          const segCount = path.length - 1;
+          const rawIdx = p * segCount;
+          const idx = Math.min(Math.floor(rawIdx), segCount - 1);
+          const frac = rawIdx - idx;
+          const smoothFrac = frac * frac * (3 - 2 * frac);
 
-          // 1. Steering input
-          const steerTarget = getSteering(t);
-          physics.steerAngle += (steerTarget - physics.steerAngle) * 0.1;
+          const from = path[idx];
+          const to = path[idx + 1];
+          const newX = from.x + (to.x - from.x) * smoothFrac;
+          const newZ = from.z + (to.z - from.z) * smoothFrac;
 
-          // 2. Accelerate forward
-          physics.speed = Math.min(physics.speed + ACCEL * dt, 6.0);
-          physics.speed *= FRICTION;
+          // Velocity direction
+          const vx = newX - waypointState.prevX;
+          const vz = newZ - waypointState.prevZ;
+          const vLen = Math.sqrt(vx * vx + vz * vz);
 
-          // 3. Turn the car based on steering and speed
-          const turnRate = physics.steerAngle * STEER_SPEED * dt;
-          physics.heading += turnRate;
+          if (vLen > 0.001) {
+            const velAngle = Math.atan2(vz, vx);
 
-          // 4. Drift physics: rear slides out when turning hard
-          const targetDrift = physics.steerAngle * DRIFT_FACTOR * (physics.speed / 4.0);
-          physics.driftAngle += (targetDrift - physics.driftAngle) * 0.08;
+            // Target heading = direction of travel
+            const targetHeading = velAngle + Math.PI / 2;
 
-          // 5. Move the car in the direction it's heading + drift offset
-          // Car model faces -Z at rotation 0
-          const moveAngle = physics.heading + physics.driftAngle;
-          const dx = -Math.sin(moveAngle) * physics.speed * dt;
-          const dz = -Math.cos(moveAngle) * physics.speed * dt;
-          physics.x += dx;
-          physics.z += dz;
+            // Drift angle: sharper corners = more drift
+            const turnSharpness = idx === 1 ? 1.2 : 0.3 + Math.sin(p * Math.PI * 3) * 0.3;
+            waypointState.driftAngle += (turnSharpness - waypointState.driftAngle) * 0.1;
 
-          // 6. Apply to Three.js objects
-          target.position.x = physics.x;
-          target.position.z = physics.z;
-          target.rotation.y = physics.heading;
+            // Smoothly adjust heading toward target
+            let headingDiff = targetHeading - waypointState.heading;
+            if (headingDiff > Math.PI) headingDiff -= Math.PI * 2;
+            if (headingDiff < -Math.PI) headingDiff += Math.PI * 2;
+            waypointState.heading += headingDiff * 0.15;
+
+            // Apply heading + drift offset
+            target.rotation.y = waypointState.heading + waypointState.driftAngle;
+          }
+
+          target.position.x = newX;
+          target.position.z = newZ;
+          waypointState.prevX = newX;
+          waypointState.prevZ = newZ;
         },
       }, 0.5);
     }, ENGINE_START_DELAY);
