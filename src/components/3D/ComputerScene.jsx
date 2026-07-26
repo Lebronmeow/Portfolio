@@ -1013,10 +1013,6 @@ function PorscheModel() {
       const kickX = orig.x + 2.5;
       const kickZ = orig.z + 1.5;
 
-      // Circle around the desk, passing in front of keyboard and right of CRT
-      const CIRCLE_CENTER = { x: 0.5, z: -0.5 };
-      const RADIUS = 5.0;
-
       const driftState = { angle: 0 };
 
       const tl = gsap.timeline({
@@ -1036,61 +1032,42 @@ function PorscheModel() {
         },
       });
 
-      // Phase 1: Smooth entry - arc left in front of the keyboard
-      // The car starts at [-4, 0, -3.5], sweeps in front of the keyboard
-      const entryAngle = -2.0; // Starting angle on the circle
-      const entryX = CIRCLE_CENTER.x + Math.cos(entryAngle) * RADIUS;
-      const entryZ = CIRCLE_CENTER.z + Math.sin(entryAngle) * RADIUS;
+      // Smooth drift path with keyframes around the desk
+      // The car starts at [-4, 0, -3.5] facing toward desk
+      // Path: left in front of keyboard → right side of CRT → behind → return
 
-      // Move to the circle entry point
-      tl.to(target.position, {
-        x: entryX,
-        z: entryZ,
-        duration: 0.5,
-        ease: 'power2.out',
-      }, 0);
+      // Define keyframes: [x, z, rotation_y]
+      const keyframes = [
+        { x: -4.0, z: -3.5, rot: 2.5, t: 0 },      // Start
+        { x: -5.0, z: -1.0, rot: 1.0, t: 0.7 },     // Left in front of keyboard
+        { x: -3.0, z: 2.0, rot: 0.2, t: 1.4 },      // Front of keyboard, turning
+        { x: 0.0, z: 3.5, rot: 3.0, t: 2.0 },       // Rear faces camera
+        { x: 3.0, z: 2.5, rot: 1.8, t: 2.8 },       // Right side of CRT, sideways
+        { x: 4.5, z: 0.0, rot: 1.2, t: 3.5 },       // Further right
+        { x: 3.0, z: -2.5, rot: 0.0, t: 4.3 },      // Behind CRT, facing front
+        { x: 0.0, z: -4.0, rot: 5.8, t: 5.0 },      // Continue behind
+        { x: -2.5, z: -4.0, rot: 5.0, t: 5.7 },     // Coming back
+        { x: orig.x, z: orig.z, rot: origRot, t: 6.5 }, // Park at start
+      ];
 
-      // Phase 2: Full 360 circle with variable drift angle for natural drift feel
-      // The drift angle varies around the circle:
-      // - Front (z>0): rear faces camera (large drift angle)
-      // - Right side (x>0): sideways (drift angle ~90°)
-      // - Behind (z<0): facing forward (small drift angle)
-      // - Left side (x<0): transitioning
+      // Animate through each keyframe
+      for (let i = 1; i < keyframes.length; i++) {
+        const prev = keyframes[i - 1];
+        const kf = keyframes[i];
+        const dur = kf.t - prev.t;
 
-      tl.to(driftState, {
-        angle: entryAngle + Math.PI * 2,
-        duration: PHASE2_TIME,
-        ease: 'none',
-        onUpdate: () => {
-          const a = driftState.angle;
-          // Position on circle
-          target.position.x = CIRCLE_CENTER.x + Math.cos(a) * RADIUS;
-          target.position.z = CIRCLE_CENTER.z + Math.sin(a) * RADIUS;
-
-          // Direction of travel (tangent to circle)
-          const tangent = a + Math.PI / 2;
-
-          // Variable drift angle based on position around the circle
-          // sin(a) = 0 at front/back, peaks at sides
-          const driftAngle = 0.3 + Math.sin(a) * 0.5;
-
-          // Apply drift: car heading = tangent + drift angle
-          target.rotation.y = tangent + driftAngle;
-        },
-      }, 0.5);
-
-      // Phase 3: Return to original position
-      tl.to(target.position, {
-        x: orig.x,
-        z: orig.z,
-        duration: PHASE3_TIME,
-        ease: 'power2.inOut',
-      }, 0.5 + PHASE2_TIME)
-      .to(target.rotation, {
-        y: originalRot.current,
-        duration: PHASE3_TIME * 0.5,
-        ease: 'power2.out',
-      }, 0.5 + PHASE2_TIME);
+        tl.to(target.position, {
+          x: kf.x,
+          z: kf.z,
+          duration: dur,
+          ease: 'power2.inOut',
+        }, prev.t)
+        .to(target.rotation, {
+          y: kf.rot,
+          duration: dur,
+          ease: 'power2.inOut',
+        }, prev.t);
+      }
     }, ENGINE_START_DELAY);
   };
 
