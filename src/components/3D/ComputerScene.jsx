@@ -1030,7 +1030,7 @@ function PorscheModel({ waypoints }) {
         },
       });
 
-      // Waypoint-following drift path
+      // Waypoint-following drift path with per-waypoint drift angles
       if (!waypoints || waypoints.length < 2) {
         busy.current = false;
         return;
@@ -1038,6 +1038,19 @@ function PorscheModel({ waypoints }) {
 
       // Add the original start position as the final park point
       const path = [...waypoints, { x: orig.x, z: orig.z }];
+      // Drift angle offset for each waypoint segment (0 = straight, positive = drift left, negative = drift right)
+      // These create the specific orientations the user wants
+      const driftAngles = path.map((wp, i) => {
+        if (i === 0) return 0;
+        if (i === 1) return 0;       // 1→2: straight
+        if (i === 2) return 1.8;     // 2→3: rear faces camera (big drift)
+        if (i === 3) return -0.8;    // 3→4: tilted left
+        if (i === 4) return 0.5;     // 4→5: slight drift right
+        if (i === 5) return -0.3;    // 5→6: slight left
+        if (i === 6) return 0.6;     // 6→7: drift right
+        return 0.3;                   // others: slight drift
+      });
+
       const totalDist = path.reduce((acc, wp, i) => {
         if (i === 0) return 0;
         return acc + Math.sqrt((wp.x - path[i-1].x)**2 + (wp.z - path[i-1].z)**2);
@@ -1049,11 +1062,12 @@ function PorscheModel({ waypoints }) {
         prevZ: orig.z,
         heading: 2.5,
         driftAngle: 0,
+        currentSeg: 0,
       };
 
       tl.to(waypointState, {
         progress: 1,
-        duration: Math.max(3, totalDist * 0.5),
+        duration: Math.max(3, totalDist * 0.45),
         ease: 'none',
         onUpdate: () => {
           const p = waypointState.progress;
@@ -1075,19 +1089,17 @@ function PorscheModel({ waypoints }) {
 
           if (vLen > 0.001) {
             const velAngle = Math.atan2(vz, vx);
-
-            // Target heading = direction of travel
             const targetHeading = velAngle + Math.PI / 2;
-
-            // Drift angle: sharper corners = more drift
-            const turnSharpness = idx === 1 ? 1.2 : 0.3 + Math.sin(p * Math.PI * 3) * 0.3;
-            waypointState.driftAngle += (turnSharpness - waypointState.driftAngle) * 0.1;
 
             // Smoothly adjust heading toward target
             let headingDiff = targetHeading - waypointState.heading;
             if (headingDiff > Math.PI) headingDiff -= Math.PI * 2;
             if (headingDiff < -Math.PI) headingDiff += Math.PI * 2;
-            waypointState.heading += headingDiff * 0.15;
+            waypointState.heading += headingDiff * 0.12;
+
+            // Blend drift angle toward the current segment's target
+            const targetDrift = driftAngles[idx + 1] || 0;
+            waypointState.driftAngle += (targetDrift - waypointState.driftAngle) * 0.08;
 
             // Apply heading + drift offset
             target.rotation.y = waypointState.heading + waypointState.driftAngle;
@@ -1097,6 +1109,7 @@ function PorscheModel({ waypoints }) {
           target.position.z = newZ;
           waypointState.prevX = newX;
           waypointState.prevZ = newZ;
+          waypointState.currentSeg = idx;
         },
       }, 0.5);
     }, ENGINE_START_DELAY);
