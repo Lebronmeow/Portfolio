@@ -39,6 +39,12 @@ const APPS = {
     type: 'file',
     dockIcon: '📝',
   },
+  me: {
+    title: 'Me',
+    icon: '👤',
+    type: 'image',
+    dockIcon: '👤',
+  },
 };
 
 const PROJECTS = [
@@ -65,7 +71,7 @@ const PROJECTS = [
     screenshot: '/images/book.png',
     color: '#5fc77e',
     icon: '📚',
-    embed: false,
+    embed: true,
   },
 ];
 
@@ -232,6 +238,8 @@ function Window({ app, onClose }) {
         return <PaintContent />;
       case 'about':
         return <AboutContent />;
+      case 'me':
+        return <MeContent />;
       default:
         return <div style={{ padding: 40, color: '#888' }}>Coming soon...</div>;
     }
@@ -695,15 +703,16 @@ function PaintContent() {
 
 // ─── About Content ───────────────────────────────────────────────────────
 function AboutContent() {
-  const [text, setText] = useState(`Hi! I'm Lebron Pereira.
+  const [text, setText] = useState(`About Me
 
-I'm a Vibe Coder — someone who builds software by describing what they want to an AI.
+The UI & Frontend Engineer
+I am a computer engineering student at Fr. Conceicao Rodrigues College with a laser focus on UI/UX design and frontend development. I am not interested in being a jack-of-all-trades; my passion lies entirely in specializing and crafting clean, intuitive, and highly responsive user interfaces using React.js and modern frontend technologies.
 
-I specialize in 3D web experiences using Three.js, React, and WebGL.
+The Builder & Problem Solver
+I love building platforms that prioritize seamless, purpose-driven user experiences. My current portfolio reflects this dedicated frontend focus, featuring live and conceptual projects like grace engineering.in, bookheavan, and a specialized analytical dashboard for detecting job scams. My goal with every line of code is to turn complex functional requirements into accessible, visually engaging digital solutions.
 
-I love creating interactive and immersive digital spaces.
-
-Feel free to ask me anything — I'll fill this up with what you tell me!`);
+The Gym Freak & Creator
+Outside of development, I am an absolute gym freak. I stay highly disciplined with a structured 5-day workout split and intense incline treadmill routines. I also have a strong creative outlet producing hip-hop and rap instrumentals in FL Studio. When it is time to unwind, I am either brainstorming new project ideas with my partner, keeping in touch with my circle, or grinding competitive matches in Fortnite, Valorant, and Counter-Strike 2.`);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -711,7 +720,30 @@ Feel free to ask me anything — I'll fill this up with what you tell me!`);
         <span>📝</span>
         <span>About_Me.txt — edit freely</span>
       </div>
-      <textarea value={text} onChange={(e) => setText(e.target.value)} style={{ width: '100%', minHeight: 280, padding: 16, background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, color: '#ddd', fontSize: 13, lineHeight: 1.7, fontFamily: 'monospace', resize: 'vertical', outline: 'none' }} />
+      <textarea value={text} onChange={(e) => setText(e.target.value)} style={{ width: '100%', minHeight: 420, padding: 16, background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, color: '#ddd', fontSize: 13, lineHeight: 1.7, fontFamily: 'monospace', resize: 'vertical', outline: 'none' }} />
+    </div>
+  );
+}
+
+// ─── Me Content ─────────────────────────────────────────────────────────
+function MeContent() {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12, alignItems: 'center' }}>
+      <div style={{ fontSize: 13, color: '#888', display: 'flex', alignItems: 'center', gap: 8, alignSelf: 'flex-start' }}>
+        <span>🖼</span>
+        <span>Me.jpeg</span>
+      </div>
+      <img
+        src="/images/me.jpeg"
+        alt="Lebron Pereira"
+        style={{
+          width: '100%',
+          maxWidth: 400,
+          borderRadius: 12,
+          border: '1px solid rgba(255,255,255,0.1)',
+          boxShadow: '0 8px 30px rgba(0,0,0,0.4)',
+        }}
+      />
     </div>
   );
 }
@@ -729,7 +761,7 @@ function WorkContent() {
 
   useEffect(() => {
     if (!isDragging) {
-      autoRotate.current = setInterval(() => { setRotation(prev => prev + 0.2); }, 30);
+      autoRotate.current = setInterval(() => { setRotation(prev => prev + 0.6); }, 30);
     }
     return () => clearInterval(autoRotate.current);
   }, [isDragging]);
@@ -741,16 +773,12 @@ function WorkContent() {
   return (
     <div onMouseDown={handleMouseDown} onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp} style={{ userSelect: 'none', padding: '10px 0' }}>
       <h3 style={{ color: '#ddd', margin: '0 0 4px', fontSize: 15, textAlign: 'center' }}>My Work</h3>
-      <p style={{ color: '#666', fontSize: 11, textAlign: 'center', margin: '0 0 12px' }}>Drag to rotate · Click to open</p>
+      <p style={{ color: '#666', fontSize: 11, textAlign: 'center', margin: '0 0 12px' }}>Drag to rotate · Click to preview live</p>
 
       {previewUrl && (
         <div style={{ width: '100%', height: 300, borderRadius: 10, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.08)', marginBottom: 12, background: '#111', position: 'relative' }}>
           <button onClick={() => setPreviewUrl(null)} style={{ position: 'absolute', top: 8, right: 8, zIndex: 10, width: 28, height: 28, background: 'rgba(0,0,0,0.6)', border: 'none', borderRadius: '50%', color: '#fff', fontSize: 14, cursor: 'pointer' }}>✕</button>
-          {previewUrl === '/images/book.png' ? (
-            <img src={previewUrl} alt="Book Heaven" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-          ) : (
-            <iframe src={previewUrl} style={{ width: '100%', height: '100%', border: 'none' }} title={previewTitle} sandbox="allow-scripts allow-same-origin" />
-          )}
+          <iframe src={previewUrl} style={{ width: '100%', height: '100%', border: 'none' }} title={previewTitle} sandbox="allow-scripts allow-same-origin" />
         </div>
       )}
 
@@ -765,15 +793,14 @@ function WorkContent() {
           const rotateY = -angle * (180 / Math.PI);
           return (
             <div key={i} style={{ position: 'absolute', width: 240, height: 300, borderRadius: 16, overflow: 'hidden', border: `2px solid ${isFront ? p.color + '99' : 'rgba(255,255,255,0.06)'}`, cursor: isFront ? 'pointer' : 'default', transform: `translateX(${x}px) translateZ(${z}px) scale(${scale}) rotateY(${rotateY}deg)`, opacity, transition: 'transform 0.05s linear, opacity 0.05s linear', transformStyle: 'preserve-3d', boxShadow: isFront ? `0 10px 40px rgba(0,0,0,0.6), 0 0 0 1px ${p.color}33 inset` : '0 4px 12px rgba(0,0,0,0.3)', zIndex: isFront ? 10 : 1 }}>
-              <div onClick={() => isFront && p.url && window.open(p.url, '_blank')} style={{ width: '100%', height: '100%', background: `linear-gradient(135deg, ${p.color}11, ${p.color}33)`, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12, padding: 20 }}>
-                <div style={{ fontSize: 56 }}>{p.icon}</div>
-                <div style={{ fontSize: 16, fontWeight: 600, color: '#fff', textAlign: 'center' }}>{p.title}</div>
-                <div style={{ fontSize: 12, color: '#aaa', textAlign: 'center', lineHeight: 1.4 }}>{p.desc}</div>
-                {isFront && (
+              <div onClick={() => { if (isFront && p.url) { if (p.screenshot) { window.open(p.url, '_blank'); } else { setPreviewUrl(p.url); setPreviewTitle(p.title); } } }} style={{ width: '100%', height: '100%', position: 'relative' }}>
+                {p.screenshot ? (
                   <>
-                    <div style={{ marginTop: 6, padding: '8px 22px', borderRadius: 100, background: p.color + '44', border: `1px solid ${p.color}88`, color: p.color, fontSize: 12, fontWeight: 600 }}>↗ Open site</div>
-                    <div onClick={(e) => { e.stopPropagation(); const url = p.screenshot || p.url; setPreviewUrl(url); setPreviewTitle(p.title); }} style={{ marginTop: 2, fontSize: 11, color: '#4f8ef7', cursor: 'pointer', textDecoration: 'underline', textUnderlineOffset: 2 }}>👁 Preview</div>
+                    <img src={p.screenshot} alt={p.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    {isFront && <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '40px 12px 12px', background: 'linear-gradient(transparent, rgba(0,0,0,0.8))', color: '#fff', fontSize: 14, fontWeight: 600, textAlign: 'center' }}>↗ Open {p.title}</div>}
                   </>
+                ) : (
+                  <iframe src={p.url} style={{ width: '100%', height: '100%', border: 'none' }} title={p.title} sandbox="allow-scripts allow-same-origin" />
                 )}
               </div>
             </div>
