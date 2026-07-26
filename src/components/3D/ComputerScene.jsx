@@ -1234,6 +1234,16 @@ function WaypointPlacer({ waypoints, setWaypoints }) {
     const handleKey = (e) => {
       if (e.key === 'z' || e.key === 'Z') setWaypoints(prev => prev.slice(0, -1));
       if (e.key === 'c' || e.key === 'C') setWaypoints([]);
+      if (e.key === 's' || e.key === 'S') {
+        setWaypoints(prev => {
+          console.log('=== WAYPOINTS ===');
+          prev.forEach((wp, i) => console.log(`${i + 1}: x=${wp.x}, z=${wp.z}`));
+          console.log('=== COPY THESE ===');
+          const str = prev.map(wp => `{ x: ${wp.x}, z: ${wp.z} }`).join(',\n  ');
+          console.log(`[\n  ${str},\n]`);
+          return prev;
+        });
+      }
     };
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
@@ -1262,7 +1272,7 @@ function WaypointPlacer({ waypoints, setWaypoints }) {
         anchorY="middle"
         frustumCulled={false}
       >
-        {`Click floor (${waypoints.length}) — Z undo  |  C clear`}
+        {`Click floor (${waypoints.length}) — Z undo  |  C clear  |  S save`}
       </Text>
     </group>
   );
