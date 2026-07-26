@@ -239,7 +239,9 @@ function MainModel({ onEnter }) {
               lower.includes('floor') ||
               lower.includes('dino') ||
               lower.includes('raptor') ||
-              lower.includes('lottiemon')
+              lower.includes('lottiemon') ||
+              lower.includes('car') ||
+              lower.includes('vehicle')
             ) {
               obj.visible = false;
               obj.scale.set(0, 0, 0);
@@ -926,9 +928,9 @@ function PorscheModel() {
   return (
     <group
       ref={groupRef}
-      position={[2.0, 0.5, 1.5]}
-      rotation={[0, -0.8, 0]}
-      scale={[0.8, 0.8, 0.8]}
+      position={[-3.0, 0.05, 2.5]}
+      rotation={[0, 0.5, 0]}
+      scale={[1.2, 1.2, 1.2]}
     >
       <primitive object={scene} />
     </group>
