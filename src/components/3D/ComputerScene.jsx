@@ -1030,104 +1030,131 @@ function PorscheModel() {
         },
       });
 
-      // ─── Physics-Based Drift Controller (bicycle model) ────────────────
-      // Build path: waypoints → return to start (car starts at orig, first target is waypoint 1)
-      const path = [...DRIFT_PATH_POINTS, { x: orig.x, z: orig.z }];
+      // ─── Physics-Based Drift Controller ────────────────────────────────
+      // Waypoints are ONLY drift triggers, NOT navigation targets.
+      // The car's trajectory comes from physics, not from waypoint positions.
 
-      // Physics state — all independent
+      // Physics state
       const sim = {
         x: orig.x, z: orig.z,
-        heading: 2.5,          // car's facing direction
-        yawVelocity: 0,         // rotation speed (rad/s)
+        heading: 2.5,
+        yawVelocity: 0,
         speed: 0,
-        vx: 0, vz: 0,          // world-space velocity
-        steerAngle: 0,          // current steering
+        vx: 0, vz: 0,
+        steerAngle: 0,
         targetSteer: 0,
-        rearGrip: 1.0,          // rear tire grip multiplier
+        rearGrip: 1.0,
         throttle: 0,
-        phase: 0,
-        targetIdx: 0,
+        phase: 0,        // 0=drive, 1=initiate, 2=drift, 3=recover, 4=return
         time: 0,
-        distToTarget: 0,
         initTimer: 0,
+        driftTimer: 0,
+        // Fixed target for phase 4 (return to start)
+        returnTarget: { x: orig.x, z: orig.z },
       };
 
       // Physics constants
       const MAX_SPEED = 10.0;
       const ACCEL = 5.0;
       const DECEL = 0.997;
-      const STEER_DAMP = 0.12;    // steering smoothing
-      const YAW_INERTIA = 0.90;   // how much yaw persists
-      const YAW_RESPONSE = 15.0;  // steering → yaw torque
-      const YAW_DAMP = 0.92;      // yaw friction
-      const GRIP_DRIFT = 0.25;    // rear grip during full drift
-      const GRIP_RECOVER = 0.015; // grip recovery rate
+      const STEER_DAMP = 0.12;
+      const YAW_INERTIA = 0.90;
+      const YAW_RESPONSE = 15.0;
+      const YAW_DAMP = 0.92;
+      const GRIP_DRIFT = 0.25;
+      const GRIP_RECOVER = 0.015;
 
-      sim.targetIdx = 0;
+      // Phase transition check based on distance to waypoints
+      // We use the waypoints as PHYSICAL LOCATIONS the car passes near
+      const wp2 = DRIFT_PATH_POINTS[1]; // waypoint 2 = drift initiation
+      const wp4 = DRIFT_PATH_POINTS[3]; // waypoint 4 = drift exit
 
       tl.to(sim, {
-        time: 12.0,
-        duration: 12.0,
+        time: 14.0,
+        duration: 14.0,
         ease: 'none',
         onUpdate: () => {
           const dt = 0.016;
-          const t = sim.time;
 
-          // 1. Target waypoint
-          const wp = path[sim.targetIdx] || path[path.length - 1];
-          const dx = wp.x - sim.x;
-          const dz = wp.z - sim.z;
-          sim.distToTarget = Math.sqrt(dx * dx + dz * dz);
+          // ── Phase transitions based on position ──
+          const distToWp2 = Math.sqrt((sim.x - wp2.x)**2 + (sim.z - wp2.z)**2);
+          const distToWp4 = Math.sqrt((sim.x - wp4.x)**2 + (sim.z - wp4.z)**2);
+          const distToStart = Math.sqrt((sim.x - orig.x)**2 + (sim.z - orig.z)**2);
 
-          // 2. Advance waypoint when close
-          if (sim.distToTarget < 2.5 && sim.targetIdx < path.length - 1) {
-            sim.targetIdx++;
-            if (sim.targetIdx === 2) { sim.phase = 1; sim.initTimer = 0; }
-            if (sim.targetIdx === 3) sim.phase = 2;
-            if (sim.targetIdx === 4) sim.phase = 3;
-            if (sim.targetIdx >= 7) sim.phase = 4;
+          if (sim.phase === 0 && distToWp2 < 4.0) {
+            sim.phase = 1; // Near waypoint 2 → initiate drift
+            sim.initTimer = 0;
+          }
+          if (sim.phase === 2 && distToWp4 < 5.0) {
+            sim.phase = 3; // Near waypoint 4 → recover
+          }
+          if (sim.phase === 3 && distToStart < 6.0) {
+            sim.phase = 4; // Near start → final approach
           }
 
-          // 3. Direction to target waypoint
-          const targetAngle = Math.atan2(wp.z - sim.z, wp.x - sim.x);
-          // Car's actual forward direction angle: (-sin(heading), -cos(heading))
-          const facingAngle = Math.atan2(-Math.cos(sim.heading), -Math.sin(sim.heading));
-          let angleToTarget = ((targetAngle - facingAngle) + Math.PI * 3) % (Math.PI * 2) - Math.PI;
-
-          // 4. Phase-based steering and throttle
-          let desiredSteer = 0;
+          // ── Phase 0: Normal drive toward waypoint 2 ──
           if (sim.phase === 0) {
-            // Normal drive: gentle steer, full grip
-            desiredSteer = Math.max(-0.8, Math.min(0.8, angleToTarget * 0.8));
+            const dx = wp2.x - sim.x;
+            const dz = wp2.z - sim.z;
+            const targetAngle = Math.atan2(dz, dx);
+            const facingAngle = Math.atan2(-Math.cos(sim.heading), -Math.sin(sim.heading));
+            let err = ((targetAngle - facingAngle) + Math.PI * 3) % (Math.PI * 2) - Math.PI;
+            sim.targetSteer = Math.max(-0.6, Math.min(0.6, err * 0.6));
             sim.throttle = 1.0;
             sim.rearGrip = 1.0;
-          } else if (sim.phase === 1) {
-            // Initiate: sharp steering flick + throttle spike
+          }
+
+          // ── Phase 1: Initiate drift ──
+          else if (sim.phase === 1) {
             sim.initTimer += dt;
-            const flick = Math.max(0, 1 - sim.initTimer / 0.6);
-            desiredSteer = 1.2 * flick;
-            sim.throttle = 0.8 + flick * 0.4;
-            sim.rearGrip = Math.max(GRIP_DRIFT, 1.0 - sim.initTimer * 1.5);
-            if (sim.initTimer > 0.8) sim.phase = 2;
-          } else if (sim.phase === 2) {
-            // Hold drift: countersteer based on slip angle
+            // Sharp steering flick, then release
+            const flick = Math.max(0, 1 - sim.initTimer / 0.5);
+            sim.targetSteer = 1.0 * flick;
+            sim.throttle = 1.0;
+            // Rear grip drops rapidly
+            sim.rearGrip = Math.max(GRIP_DRIFT, 1.0 - sim.initTimer * 1.8);
+            if (sim.initTimer > 0.7) {
+              sim.phase = 2;
+              sim.driftTimer = 0;
+            }
+          }
+
+          // ── Phase 2: Hold drift — NO WAYPOINT TARGETING ──
+          else if (sim.phase === 2) {
+            sim.driftTimer += dt;
+            // Countersteer based on slip angle only
             const velAngle = Math.atan2(sim.vz, sim.vx);
-            let slipAngle = ((sim.heading - Math.PI / 2) - velAngle + Math.PI * 3) % (Math.PI * 2) - Math.PI;
-            desiredSteer = -slipAngle * 0.4;
-            sim.throttle = 0.8;
-            sim.rearGrip = Math.max(GRIP_DRIFT, sim.rearGrip - 0.005);
-          } else if (sim.phase === 3) {
-            // Recovery: gradually restore grip, reduce steering
+            const headingAngle = Math.atan2(-Math.cos(sim.heading), -Math.sin(sim.heading));
+            let slipAngle = ((headingAngle - velAngle) + Math.PI * 3) % (Math.PI * 2) - Math.PI;
+            // Countersteer into the slide
+            sim.targetSteer = -slipAngle * 0.35;
+            sim.throttle = 0.7;
+            // Keep rear grip low
+            sim.rearGrip = Math.max(GRIP_DRIFT, sim.rearGrip - 0.003);
+          }
+
+          // ── Phase 3: Recovery ──
+          else if (sim.phase === 3) {
             const velAngle = Math.atan2(sim.vz, sim.vx);
-            let slipAngle = ((sim.heading - Math.PI / 2) - velAngle + Math.PI * 3) % (Math.PI * 2) - Math.PI;
-            desiredSteer = -slipAngle * 0.15;
+            const headingAngle = Math.atan2(-Math.cos(sim.heading), -Math.sin(sim.heading));
+            let slipAngle = ((headingAngle - velAngle) + Math.PI * 3) % (Math.PI * 2) - Math.PI;
+            // Gradually reduce countersteer
+            sim.targetSteer = -slipAngle * 0.12;
+            sim.throttle = 0.4;
+            // Restore grip
+            sim.rearGrip = Math.min(1.0, sim.rearGrip + 0.02);
+          }
+
+          // ── Phase 4: Return to start ──
+          else {
+            const dx = orig.x - sim.x;
+            const dz = orig.z - sim.z;
+            const targetAngle = Math.atan2(dz, dx);
+            const facingAngle = Math.atan2(-Math.cos(sim.heading), -Math.sin(sim.heading));
+            let err = ((targetAngle - facingAngle) + Math.PI * 3) % (Math.PI * 2) - Math.PI;
+            sim.targetSteer = Math.max(-0.5, Math.min(0.5, err * 0.4));
             sim.throttle = 0.5;
-            sim.rearGrip = Math.min(1.0, sim.rearGrip + GRIP_RECOVER * 2);
-          } else {
-            // Return to start: normal driving
-            desiredSteer = Math.max(-0.8, Math.min(0.8, angleToTarget * 0.6));
-            sim.throttle = 0.5;
-            sim.rearGrip = Math.min(1.0, sim.rearGrip + GRIP_RECOVER * 3);
+            sim.rearGrip = Math.min(1.0, sim.rearGrip + 0.03);
           }
 
           // 5. Smooth steering
