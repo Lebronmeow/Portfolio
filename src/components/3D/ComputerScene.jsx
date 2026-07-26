@@ -93,8 +93,8 @@ function MainModel({ onEnter }) {
     const brightness = Math.max(0.5, Math.min(1.0, pulse + micro));
 
     if (screenMatRef.current) {
-      const val = brightness * 0.15;
-      screenMatRef.current.color.setRGB(val, val, val * 1.3);
+      const val = brightness * 0.08;
+      screenMatRef.current.color.setRGB(val, val, val * 1.4);
     }
     if (textRef.current) {
       textRef.current.fillOpacity = Math.max(0.5, brightness);
